@@ -18,6 +18,12 @@ struct ConfirmDialog: View {
     let model: ConfirmDialogModel
     let onDismiss: () -> Void
 
+    /// Default-on-appear focus prevents the dialog opening with focus
+    /// "trapped" on the underlying view that triggered it. Per the prior
+    /// implementation that always landed on Yes / Confirm.
+    private enum Field: Hashable { case cancel, confirm }
+    @FocusState private var focused: Field?
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.55)
@@ -47,12 +53,14 @@ struct ConfirmDialog: View {
                         model.onReject?.perform()
                         onDismiss()
                     }
+                    .focused($focused, equals: .cancel)
 
                     ChiakiSheetPrimaryButton(title: "Confirm",
                                              systemImage: "checkmark.circle.fill") {
                         model.onConfirm.perform()
                         onDismiss()
                     }
+                    .focused($focused, equals: .confirm)
                 }
                 .padding(.top, 4)
             }
@@ -69,6 +77,13 @@ struct ConfirmDialog: View {
                     .stroke(Theme.ink600, lineWidth: 1)
             )
             .shadow(color: Color.black.opacity(0.55), radius: 50, x: 0, y: 20)
+            .focusSection()
+            .onAppear {
+                // Land on Cancel by default — destructive Confirm should
+                // require an explicit move-and-press, never an accidental
+                // Return-on-default.
+                focused = .cancel
+            }
             .onExitCommand {
                 model.onReject?.perform()
                 onDismiss()
