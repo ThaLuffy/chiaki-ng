@@ -48,9 +48,13 @@ struct AppSettings: Codable, Equatable {
     var verticalSync: Bool          = true
 
     // MARK: Audio
-    /// Audio buffer depth in milliseconds. Default 80 ms — see
-    /// [`docs/architecture/audio-pipeline.md`](../../docs/architecture/audio-pipeline.md).
-    var audioBufferMs: Int = 80
+    /// Audio buffer depth in milliseconds. The buffer is a network-jitter
+    /// reservoir, not an audio-output buffer — on wired LAN the network
+    /// jitter floor is sub-millisecond, so 30 ms is comfortable steady-state
+    /// headroom without compromising input lipsync. The desktop default
+    /// (80 ms) is sized for Wi-Fi; we don't need that margin here.
+    /// See [`docs/optimization/native-alternatives-latency-first.md`](../../docs/optimization/native-alternatives-latency-first.md) Phase A.5.
+    var audioBufferMs: Int = 30
     var audioVolume:   Int = 100   // 0–100
 
     // MARK: Notifications

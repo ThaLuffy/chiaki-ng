@@ -82,8 +82,8 @@ final class ModelCodableTests: XCTestCase {
         // Personal-use scope: Apple TV 4K 3rd gen + PS5 + DualSense at 4K60 HDR
         // (see ../CLAUDE.md and docs/phases.md Phase 2).
         let s = AppSettings()
-        XCTAssertEqual(s.audioBufferMs, 80,
-                       "Audio buffer default is 80ms — see docs/architecture/audio-pipeline.md")
+        XCTAssertEqual(s.audioBufferMs, 30,
+                       "30ms wired-LAN audio jitter buffer — see docs/optimization/native-alternatives-latency-first.md Phase A.5.")
         XCTAssertEqual(s.bitrateKbps, 30_000,
                        "30 Mbps default for 4K60 HEVC HDR — see docs/phases.md Phase 2.")
         XCTAssertEqual(s.fps, .fps60)
