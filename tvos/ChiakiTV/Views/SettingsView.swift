@@ -386,72 +386,138 @@ private struct ConsolesTab: View {
 private struct ControllerDiagnosticTab: View {
     @State private var snapshot = ControllerSnapshot()
     @State private var pollTask: Task<Void, Never>? = nil
+    @State private var diagnosticActive = false
 
     var body: some View {
-        Form {
+        Group {
             if snapshot.controllers.isEmpty {
-                Section {
-                    ContentUnavailableView(
-                        "No controllers connected",
-                        systemImage: "gamecontroller",
-                        description: Text("Pair a DualSense or MFi controller in tvOS Settings → Remotes & Devices.")
-                    )
+                ContentUnavailableView {
+                    Label("No controllers connected", systemImage: "gamecontroller")
+                } description: {
+                    Text("Pair a DualSense or MFi controller in tvOS Settings → Remotes & Devices.")
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if diagnosticActive {
+                diagnosticGrid
             } else {
-                ForEach(0..<snapshot.controllers.count, id: \.self) { idx in
-                    controllerSections(snapshot.controllers[idx])
-                }
+                idleView
             }
         }
-        .formStyle(.grouped)
-
         .onAppear { startPolling() }
         .onDisappear { stopPolling() }
     }
 
-    @ViewBuilder
-    private func controllerSections(_ c: ControllerSnapshot.Entry) -> some View {
-        Section {
-            LabeledContent("Profile") {
-                Text(c.profileClass)
-                    .font(Theme.font(.mono))
-                    .foregroundStyle(.secondary)
-            }
+    // MARK: - Idle view (controllers connected, diagnostic not started)
 
-            LabeledContent("Home button") {
-                if c.hasHome {
-                    Label("Exposed", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(Theme.green500)
-                } else {
-                    Label("Not exposed", systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(Theme.rose500)
+    private var idleView: some View {
+        Form {
+            ForEach(0..<snapshot.controllers.count, id: \.self) { idx in
+                let c = snapshot.controllers[idx]
+                Section {
+                    SettingsRow("Profile", valueInset: 2) {
+                        Text(c.profileClass)
+                            .font(Theme.font(.mono))
+                            .foregroundStyle(.secondary)
+                    }
+                    SettingsRow("Home button", valueInset: 2) {
+                        if c.hasHome {
+                            Label("Exposed", systemImage: "checkmark.circle.fill")
+                                .foregroundStyle(Theme.green500)
+                        } else {
+                            Label("Not exposed", systemImage: "exclamationmark.triangle.fill")
+                                .foregroundStyle(Theme.rose500)
+                        }
+                    }
+                } header: {
+                    Text(c.vendorName)
+                } footer: {
+                    if !c.hasHome {
+                        Text("Long-press the Options button (Create on DualSense, View on Xbox) past 0.6 s to reach the PS5's PS button while streaming.")
+                    }
                 }
             }
-        } header: {
-            Text(c.vendorName)
-        } footer: {
-            if !c.hasHome {
-                Text("Long-press the Options button (Create on DualSense, View on Xbox) past 0.6 s to reach the PS5's PS button while streaming.")
+
+            Section {
+                Button {
+                    diagnosticActive = true
+                } label: {
+                    Label("Start button diagnostic", systemImage: "play.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .listRowBackground(Color.clear)
+            } footer: {
+                Text("Captures the D-pad while active so your inputs don't navigate away from this screen. Press Menu / B to exit.")
             }
         }
+        .formStyle(.grouped)
+    }
 
-        let groups = ControllerSnapshot.cluster(buttons: c.buttons)
-        ForEach(groups) { group in
-            Section {
-                ForEach(0..<group.buttons.count, id: \.self) { i in
-                    let b = group.buttons[i]
-                    LabeledContent(b.name) {
+    // MARK: - Diagnostic grid (active mode — no focusable elements)
+    //
+    // While `diagnosticActive` is true, the screen has zero focusable
+    // children — that's what stops the D-pad from moving focus, scrolling,
+    // or dismissing. The only escape is the Menu/B button, captured via
+    // `onExitCommand`. Per Apple HIG: tvOS apps may capture Menu in
+    // contexts where it's the natural exit affordance for a sub-mode.
+
+    private var diagnosticGrid: some View {
+        let c = snapshot.controllers[0]
+        let columns = [
+            GridItem(.flexible(), spacing: Theme.space5),
+            GridItem(.flexible(), spacing: Theme.space5)
+        ]
+
+        return VStack(spacing: Theme.space6) {
+            diagnosticHeader(for: c)
+
+            LazyVGrid(columns: columns,
+                      alignment: .leading,
+                      spacing: Theme.space5) {
+                ForEach(c.buttons, id: \.name) { b in
+                    HStack {
                         Image(systemName: b.pressed
                               ? "circle.fill" : "circle")
                             .foregroundStyle(b.pressed
                                              ? Theme.green500
                                              : .secondary)
+                        Text(b.name)
+                            .font(.system(.body, design: .default))
+                            .lineLimit(1)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, Theme.space2)
+                    .padding(.horizontal, Theme.space4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color.white.opacity(b.pressed ? 0.10 : 0.04))
+                    )
                 }
-            } header: {
-                Text(group.title)
             }
+            .padding(.horizontal, Theme.screenInset)
+
+            Spacer(minLength: 0)
+
+            Text("Press Menu / B to exit diagnostic")
+                .font(.system(.footnote))
+                .foregroundStyle(.secondary)
+                .padding(.bottom, Theme.space5)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.top, Theme.space6)
+        .onExitCommand { diagnosticActive = false }
+    }
+
+    private func diagnosticHeader(for c: ControllerSnapshot.Entry) -> some View {
+        VStack(spacing: Theme.space2) {
+            Text(c.vendorName)
+                .font(.system(.title2).weight(.semibold))
+            Text(c.profileClass)
+                .font(.system(.footnote, design: .monospaced))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private func startPolling() {
