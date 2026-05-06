@@ -142,7 +142,7 @@ private struct StreamTab: View {
                 segmentedRow("Render preset", selection: $appState.settings.renderPreset,
                              options: RenderPreset.allCases) { $0.label }
 
-                SettingsRow("Bitrate") {
+                SettingsRow("Bitrate", valueInset: 2) {
                     TVSlider(value: $appState.settings.bitrateKbps,
                              range: 2_000...50_000, step: 500,
                              format: { "\($0 / 1_000) Mbps" })
@@ -154,7 +154,9 @@ private struct StreamTab: View {
             }
 
             Section {
-                Toggle("Vertical sync", isOn: $appState.settings.verticalSync)
+                segmentedRow("Vertical sync",
+                             selection: $appState.settings.verticalSync,
+                             options: [false, true]) { $0 ? "On" : "Off" }
             } footer: {
                 Text("Reduces tearing. Adds ~16 ms of latency.")
             }
@@ -192,12 +194,12 @@ private struct NetworkTab: View {
         @Bindable var appState = appState
         Form {
             Section {
-                SettingsRow("Audio buffer") {
+                SettingsRow("Audio buffer", valueInset: 2) {
                     TVSlider(value: $appState.settings.audioBufferMs,
                              range: 20...500, step: 10,
                              format: { "\($0) ms" })
                 }
-                SettingsRow("Volume") {
+                SettingsRow("Volume", valueInset: 2) {
                     TVSlider(value: $appState.settings.audioVolume,
                              range: 0...100, step: 5,
                              format: { "\($0)%" })
@@ -209,12 +211,12 @@ private struct NetworkTab: View {
             }
 
             Section {
-                SettingsRow("Weak Wi-Fi threshold") {
+                SettingsRow("Weak Wi-Fi threshold", valueInset: 2) {
                     TVSlider(value: $appState.settings.weakWifiThresholdPct,
                              range: 1...20, step: 1,
                              format: { "\($0)%" })
                 }
-                SettingsRow("Reported loss ceiling") {
+                SettingsRow("Reported loss ceiling", valueInset: 2) {
                     TVSlider(value: $appState.settings.packetLossReportedMax,
                              range: 1...20, step: 1,
                              format: { "\($0)%" })
@@ -254,7 +256,7 @@ private struct AppTab: View {
             }
 
             Section {
-                SettingsRow("PSN Account-ID") {
+                SettingsRow("PSN Account-ID", valueInset: 2) {
                     Button {
                         psnDraft = appState.settings.psnAccountId
                         psnPromptShown = true
@@ -273,9 +275,15 @@ private struct AppTab: View {
             }
 
             Section {
-                Toggle("Streamer Mode", isOn: $appState.settings.streamerMode)
-                Toggle("Verbose Logs", isOn: $appState.settings.verboseLogs)
-                Toggle("Show Stream Stats", isOn: $appState.settings.showStreamStats)
+                segmentedRow("Streamer Mode",
+                             selection: $appState.settings.streamerMode,
+                             options: [false, true]) { $0 ? "On" : "Off" }
+                segmentedRow("Verbose Logs",
+                             selection: $appState.settings.verboseLogs,
+                             options: [false, true]) { $0 ? "On" : "Off" }
+                segmentedRow("Show Stream Stats",
+                             selection: $appState.settings.showStreamStats,
+                             options: [false, true]) { $0 ? "On" : "Off" }
             } header: {
                 Text("Diagnostics")
             } footer: {

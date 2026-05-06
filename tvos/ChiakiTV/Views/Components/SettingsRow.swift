@@ -26,6 +26,7 @@ import SwiftUI
 /// ```
 struct SettingsRow<Value: View>: View {
     let label: String
+    let valueInset: CGFloat
     @ViewBuilder var value: () -> Value
 
     /// Fixed label-column width. Wide enough for the longest label in
@@ -38,8 +39,17 @@ struct SettingsRow<Value: View>: View {
     /// pt of breathing room so toggles / slider rows match.
     private let minRowHeight: CGFloat = 80
 
-    init(_ label: String, @ViewBuilder value: @escaping () -> Value) {
+    /// `valueInset` adds horizontal padding *inside* the value column —
+    /// not outside the row. The segmented `Picker` rows already fill
+    /// edge-to-edge by design (matching Refresh rate's geometry), so
+    /// they pass `0`. Other value types (slider, drill-in picker, button)
+    /// use `2` so they don't kiss the trailing edge of the row's
+    /// rounded background.
+    init(_ label: String,
+         valueInset: CGFloat = 0,
+         @ViewBuilder value: @escaping () -> Value) {
         self.label = label
+        self.valueInset = valueInset
         self.value = value
     }
 
@@ -52,6 +62,7 @@ struct SettingsRow<Value: View>: View {
 
             value()
                 .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding(.horizontal, valueInset)
         }
         .frame(minHeight: minRowHeight)
         .listRowBackground(
