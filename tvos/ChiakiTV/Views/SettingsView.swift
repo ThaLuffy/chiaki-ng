@@ -30,7 +30,7 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            HStack(alignment: .top, spacing: Theme.space7) {
+            HStack(alignment: .top, spacing: Theme.space8) {
                 rail
                 detailContent
                     .frame(maxWidth: .infinity, alignment: .topLeading)
