@@ -30,13 +30,13 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            HStack(alignment: .top, spacing: Theme.space6) {
+            HStack(alignment: .top, spacing: Theme.space7) {
                 rail
                 detailContent
-                    .frame(maxWidth: 1200, alignment: .topLeading)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
             }
             .padding(.horizontal, Theme.space7)
-            .padding(.top, Theme.space4)
+            .padding(.top, Theme.space6)
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .navigationTitle("Settings")
             .toolbar {
@@ -48,7 +48,7 @@ struct SettingsView: View {
     }
 
     private var rail: some View {
-        VStack(alignment: .leading, spacing: Theme.space2) {
+        VStack(alignment: .leading, spacing: Theme.space3) {
             ForEach(SettingsTab.allCases) { tab in
                 Button {
                     selectedTab = tab
@@ -135,10 +135,10 @@ private struct StreamTab: View {
                 segmentedRow("Render preset", selection: $appState.settings.renderPreset,
                              options: RenderPreset.allCases) { $0.label }
 
-                Picker("Bitrate", selection: $appState.settings.bitrateKbps) {
-                    ForEach(Array(stride(from: 2_000, through: 50_000, by: 500)), id: \.self) { v in
-                        Text("\(v / 1000) Mbps").tag(v)
-                    }
+                LabeledContent("Bitrate") {
+                    TVSlider(value: $appState.settings.bitrateKbps,
+                             range: 2_000...50_000, step: 500,
+                             format: { "\($0 / 1_000) Mbps" })
                 }
             } header: {
                 Text("Quality")
@@ -187,16 +187,15 @@ private struct NetworkTab: View {
         @Bindable var appState = appState
         Form {
             Section {
-                Picker("Audio buffer", selection: $appState.settings.audioBufferMs) {
-                    ForEach(Array(stride(from: 20, through: 500, by: 10)), id: \.self) { v in
-                        Text("\(v) ms").tag(v)
-                    }
+                LabeledContent("Audio buffer") {
+                    TVSlider(value: $appState.settings.audioBufferMs,
+                             range: 20...500, step: 10,
+                             format: { "\($0) ms" })
                 }
-
-                Picker("Volume", selection: $appState.settings.audioVolume) {
-                    ForEach(Array(stride(from: 0, through: 100, by: 5)), id: \.self) { v in
-                        Text("\(v)%").tag(v)
-                    }
+                LabeledContent("Volume") {
+                    TVSlider(value: $appState.settings.audioVolume,
+                             range: 0...100, step: 5,
+                             format: { "\($0)%" })
                 }
             } header: {
                 Text("Audio")
@@ -205,18 +204,15 @@ private struct NetworkTab: View {
             }
 
             Section {
-                Picker("Weak Wi-Fi threshold",
-                       selection: $appState.settings.weakWifiThresholdPct) {
-                    ForEach(1...20, id: \.self) { v in
-                        Text("\(v)%").tag(v)
-                    }
+                LabeledContent("Weak Wi-Fi threshold") {
+                    TVSlider(value: $appState.settings.weakWifiThresholdPct,
+                             range: 1...20, step: 1,
+                             format: { "\($0)%" })
                 }
-
-                Picker("Reported loss ceiling",
-                       selection: $appState.settings.packetLossReportedMax) {
-                    ForEach(1...20, id: \.self) { v in
-                        Text("\(v)%").tag(v)
-                    }
+                LabeledContent("Reported loss ceiling") {
+                    TVSlider(value: $appState.settings.packetLossReportedMax,
+                             range: 1...20, step: 1,
+                             format: { "\($0)%" })
                 }
             } header: {
                 Text("Connection diagnostics")
