@@ -65,12 +65,13 @@ struct HostCard: View {
         .modifier(PulseShadow(active: host.state == .ready && !reduceMotion,
                               cardFocused: cardFocused,
                               rimColor: rimColor))
-        // The card is its own focus section, paired with the toolbar's
-        // focus section above. tvOS routes between sibling sections via
-        // spatial alignment, so Up from Connect → toolbar, Down from
-        // Settings → Connect. Without this, the card's buttons aren't
-        // visible to the engine as a focus destination from the toolbar.
-        .focusSection()
+        // No `.focusSection()` — per `swiftui-skills:focus-engine`,
+        // sections are only needed when default directional movement
+        // *skips* the intended group. Action row buttons are evenly
+        // adjacent so default routing reaches them. Wrapping the card
+        // in a section was making Right-from-Connect jump up to the
+        // toolbar instead of right to Hide, because the section's
+        // boundary preferred a sibling section over an internal button.
         .defaultFocus($focused, .connect)
         .animation(.smooth(duration: 0.28), value: cardFocused)
     }
@@ -192,6 +193,15 @@ struct HostCard: View {
                             glyph: "trash.fill", action: onForget)
         }
         .padding(.top, Theme.space2)
+        // Group the action row's focusables so directional movement
+        // stays inside it. Without this, Right from Connect was being
+        // routed up-right to the toolbar's focusSection (which the
+        // engine treated as a more legitimate destination than a loose
+        // sibling Button at the same level).
+        // Per `swiftui-skills:focus-engine`: 'Use focusSection() to
+        // guide directional movement across groups of focusable
+        // descendants in uneven layouts.'
+        .focusSection()
     }
 
     private func secondaryButton(_ key: Action, title: String, glyph: String,
