@@ -71,5 +71,6 @@ uint32_t chiaki_tv_lib_version_packed(void);
 #include "chiaki_bridge_discovery.h"
 #include "chiaki_bridge_regist.h"
 #include "chiaki_bridge_session.h"
+#include "chiaki_bridge_video.h"
 
 #endif /* CHIAKI_BRIDGE_H */
