@@ -1,0 +1,127 @@
+ChiakiLogBridge: installed
+Type: Info | Timestamp: 2026-05-05 20:32:26.032470+02:00 | Process: ChiakiTV | Library: ChiakiTV.debug.dylib | Subsystem: org.streetpea.chiakitv | Category: bridge | TID: 0x61eb76
+DiscoveryService: started
+Type: Info | Timestamp: 2026-05-05 20:32:26.032968+02:00 | Process: ChiakiTV | Library: ChiakiTV.debug.dylib | Subsystem: org.streetpea.chiakitv | Category: network | TID: 0x61eb76
+ControllerService: attached 'Gamepad'
+Type: Info | Timestamp: 2026-05-05 20:32:26.078649+02:00 | Process: ChiakiTV | Library: ChiakiTV.debug.dylib | Subsystem: org.streetpea.chiakitv | Category: controller | TID: 0x61eb76
+[I] Discovery Service detected new host with id 78C881D71099
+Starting session request for PS5
+Trying to request session from 192.168.2.26:9295
+StreamSession: started against 192.168.2.26 (1920x1080 @60fps codec=h265)
+Connected to 192.168.2.26:9295
+Sending session request
+Session request successful
+Starting ctrl
+Ctrl connected to 192.168.2.26:9295
+Sending ctrl request
+Ctrl received http header as response
+Ctrl received ctrl request http response
+Ctrl got Server Type: 2
+Ctrl connected
+CTRL RECEIVED
+     0 00 00 00 01 00 05 00 00 79                      ........y
+Ctrl received Login message: success
+CTRL RECEIVED
+     0 00 00 00 11 00 33 00 00 b1 e3 05 64 2b 31 c8 ce .....3.....d+1..
+    10 db 33 c8 ff c0 11 d8 53 b7                      .3.....S.
+Received presumably invalid Session Id:
+     0 10 49 6e 76 61 6c 69 64 53 65 73 73 69 6f 6e 49 .InvalidSessionI
+    10 64                                              d
+Received Session Id is too short
+Ctrl set fallback session Id 181448CzxPhuh1YxxuehkfKeqKdYvwVeWzQ2RBkoAi8BKuK+ZCBO1JaPAG56n2J08BwHQB
+Starting Senkusha
+CTRL RECEIVED
+     0 00 00 00 02 00 16 00 00 40 8d                   ........@.
+Takion connecting (version 7)
+Takion enabled Don't Fragment Bit
+Takion sent init
+Takion received init ack with remote tag 0x2983a912, outbound streams: 0x64, inbound streams: 0x64
+Takion sent cookie
+Takion received cookie ack
+Takion connected
+Setting takion versions
+Senkusha successfully set takion version
+Senkusha sending big
+Senkusha successfully received bang
+Senkusha Ping Test with count 10 starting
+Senkusha enabled echo
+[…10 ping/pong cycles, RTT 2.798–5.067 ms, avg 3.446 ms…]
+Senkusha disabled echo
+Senkusha determined average RTT = 3.446 ms
+Senkusha starting MTU in test with min 576, max 1454, retries 3, timeout 17 ms
+Senkusha MTU 1454 success
+Senkusha determined inbound MTU 1454
+Senkusha starting MTU out test with min 576, max 1454, retries 3, timeout 17 ms
+Senkusha sent initial client MTU command
+Senkusha received expected Client MTU Command
+Senkusha MTU 1454 out ping attempt 0
+Senkusha MTU ping 1454 success
+Senkusha determined outbound MTU 1454
+Senkusha sending final Client MTU Command
+Senkusha is disconnecting
+Senkusha closed takion
+Senkusha completed successfully
+Takion connecting (version 12)
+Takion enabled Don't Fragment Bit
+Takion sent init
+Takion received init ack with remote tag 0x1b148ce2, outbound streams: 0x64, inbound streams: 0x64
+Takion sent cookie
+Takion received cookie ack
+Takion connected
+StreamConnection sending big
+BANG received
+Crypt has become available. Re-checking MACs of 0 packets
+StreamConnection successfully received bang
+CTRL RECEIVED
+     0 00 00 00 08 00 41 00 00 18 4f 9a 8e 22 5a 98 a2 .....A...O.."Z..
+     0 00 00 00 00 02 01 00 00                         ........
+StreamConnection received audio header:
+     0 02 10 00 00 bb 80 00 00 01 e0 00 00 00 01       ..............
+Audio Header:
+  channels = 2
+  bits = 16
+  rate = 48000
+  frame size = 480
+  unknown = 1
+ChiakiOpusDecoder initialized
+Video Profiles:
+  0: 1920x1080
+StreamConnection successfully received streaminfo
+Setting motion control origin to current position
+AddInstanceForFactory: No factory registered for id <CFUUID 0x6000002c39a0> F8BB1C28-BAE8-11D6-9C31-00039315CD46
+Type: Error | Timestamp: 2026-05-05 20:32:34.691706+02:00 | Process: ChiakiTV | Library: CoreFoundation | Subsystem: com.apple.CFBundle | Category: plugin | TID: 0x61eb76
+AudioPlayer: started (rate=48000.0 ch=2 bits=16)
+Type: Info | Timestamp: 2026-05-05 20:32:34.780461+02:00 | Process: ChiakiTV | Library: ChiakiTV.debug.dylib | Subsystem: org.streetpea.chiakitv | Category: audio | TID: 0x61eb76
+StreamSession: connected
+Switched to profile 0, resolution: 1920x1080
+         HALC_ProxyIOContext.cpp:1623  HALC_ProxyIOContext::IOWorkLoop: skipping cycle due to overload
+Type: Error | Timestamp: 2026-05-05 20:32:34.868157+02:00 | Process: ChiakiTV | Library: CoreAudio | Subsystem: com.apple.coreaudio | Category: AMCP | TID: 0x61ee79
+VideoDecoder: rebuilt session (codec=h265 vps=24B sps=49B pps=7B)
+Type: Info | Timestamp: 2026-05-05 20:32:34.923360+02:00 | Process: ChiakiTV | Library: ChiakiTV.debug.dylib | Subsystem: org.streetpea.chiakitv | Category: video | TID: 0x61ee55
+Takion AV reorder timeout: skipping 8 missing packet(s) before 0x4e
+Type: Debug | Timestamp: 2026-05-05 20:32:34.955951
+Takion AV reorder timeout: skipping 12 missing packet(s) before 0x5b
+Type: Debug | Timestamp: 2026-05-05 20:32:34.974185
+Frame Processor received 8+0 / 16+1 units, attempting FEC
+FEC failed
+Type: Error | Timestamp: 2026-05-05 20:32:34.974971
+Missing unit 0x7
+Missing unit 0x8
+Missing unit 0x9
+Missing unit 0xa
+Missing unit 0xb
+Missing unit 0xc
+Missing unit 0xd
+Missing unit 0xe
+StreamConnection reporting corrupt frame(s) from 3 to 3
+StreamConnection requesting IDR frame
+FEC failed, waiting for IDR frame
+Failed to complete frame 3
+Video receiver could not flush frame.
+[…9 cycles of "Detected missing or corrupt frame(s) from 3 to N", N climbs 3→12, ~17 ms apart…]
+Received IDR frame, resuming decode
+Type: Info | Timestamp: 2026-05-05 20:32:35.065145
+[…heartbeat cycle every 5 s: CTRL RECEIVED 00 00 00 00 00 fe 00 00 → "Ctrl received Heartbeat, sending reply"…]
+[…benign UIKit/FrontBoard system noise: UIKeyboardLayoutMonolith, FBSSceneSnapshot errors…]
+Debug session ended with code 9: killed
+Type: LLDB

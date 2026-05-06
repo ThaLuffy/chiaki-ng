@@ -1,0 +1,149 @@
+ChiakiLogBridge: installed
+Type: Info | Timestamp: 2026-05-05 17:46:25.264299+02:00 | Process: ChiakiTV | Library: ChiakiTV.debug.dylib | Subsystem: org.streetpea.chiakitv | Category: bridge | TID: 0x5906ea
+DiscoveryService: started
+Type: Info | Timestamp: 2026-05-05 17:46:25.264836+02:00 | Process: ChiakiTV | Library: ChiakiTV.debug.dylib | Subsystem: org.streetpea.chiakitv | Category: network | TID: 0x5906ea
+ControllerService: attached 'Gamepad'
+Type: Info | Timestamp: 2026-05-05 17:46:25.308269+02:00 | Process: ChiakiTV | Library: ChiakiTV.debug.dylib | Subsystem: org.streetpea.chiakitv | Category: controller | TID: 0x5906ea
+[I] Discovery Service detected new host with id 78C881D71099
+Type: stdio
+Changing the translatesAutoresizingMaskIntoConstraints property of a UICollectionViewCell that is managed by a UICollectionView is not supported, and will result in incorrect self-sizing. View: <_UIAlertControllerTextFieldViewCollectionCell: 0x1016310a0; frame = (0 0; 586 24); gestureRecognizers = <NSArray: 0x6000000045f0>; layer = <CALayer: 0x600000ca7ab0>>
+Type: Error | Timestamp: 2026-05-05 17:47:03.039191+02:00 | Process: ChiakiTV | Library: UIKitCore | Subsystem: com.apple.UIKit | Category: LayoutConstraints | TID: 0x5906ea
+Unable to simultaneously satisfy constraints.
+    Probably at least one of the constraints in the following list is one you don't want.
+    Try this:
+        (1) look at each constraint and try to figure out which you don't expect;
+        (2) find the code that added the unwanted constraint or constraints and fix it.
+(
+    "<NSLayoutConstraint:0x600002111d60 V:|-(9)-[_UIAlertControllerTextField:0x104076800]   (active, names: '|':UIView:0x101c39500 )>",
+    "<NSLayoutConstraint:0x6000021111d0 _UIAlertControllerTextField:0x104076800.height >= 70   (active)>",
+    "<NSLayoutConstraint:0x600002111310 V:[_UIAlertControllerTextField:0x104076800]-(9)-|   (active, names: '|':UIView:0x101c39500 )>",
+    "<NSLayoutConstraint:0x600002111cc0 V:|-(0)-[UIView:0x101c39500]   (active, names: '|':_UIAlertControllerTextFieldView:0x101d389c0 )>",
+    "<NSLayoutConstraint:0x600002111d10 V:[UIView:0x101c39500]-(0)-|   (active, names: '|':_UIAlertControllerTextFieldView:0x101d389c0 )>",
+    "<NSLayoutConstraint:0x600002109360 UIView:0x101654230.height == _UIAlertControllerTextFieldView:0x101d389c0.height   (active)>",
+    "<NSLayoutConstraint:0x600002109ae0 'UIView-Encapsulated-Layout-Height' UIView:0x101654230.height == 70   (active)>"
+)
+
+Will attempt to recover by breaking constraint
+<NSLayoutConstraint:0x600002111310 V:[_UIAlertControllerTextField:0x104076800]-(9)-|   (active, names: '|':UIView:0x101c39500 )>
+
+Make a symbolic breakpoint at UIViewAlertForUnsatisfiableConstraints to catch this in the debugger.
+The methods in the UIConstraintBasedLayoutDebugging category on UIView listed in <UIKitCore/UIView.h> may also be helpful.
+Type: Error | Timestamp: 2026-05-05 17:47:03.040819+02:00 | Process: ChiakiTV | Library: UIKitCore | Subsystem: com.apple.UIKit | Category: LayoutConstraints | TID: 0x5906ea
+UIKeyboardLayoutMonolith implements focusItemsInRect: - caching for linear focus movement is limited as long as this view is on screen.
+Type: Error | Timestamp: 2026-05-05 17:47:07.048464+02:00 | Process: ChiakiTV | Library: UIKitCore | Subsystem: com.apple.UIKit | Category: UIFocus | TID: 0x5906ea
+Could not find cached accumulator for token=890B63EA type:0 in -[TUIKeyboardCandidateMultiplexer receiveExternalAutocorrectionUpdate:requestToken:]_block_invoke
+[…TextInputUI keyboard candidate-cache noise omitted, repeats during typing…]
+RegistrationService: started against 192.168.2.26
+Type: Info | Timestamp: 2026-05-05 17:47:34.616275+02:00 | Process: ChiakiTV | Library: ChiakiTV.debug.dylib | Subsystem: org.streetpea.chiakitv | Category: session | TID: 0x5906ea
+Regist starting search
+Regist sending search packet
+Regist received search response from 192.168.2.26
+Regist connected to 192.168.2.26, sending request
+Regist waiting for response
+Regist response payload (decrypted):
+RP-Support Cmd: 132000
+Regist successfully received response
+RegistrationService: paired 'PS5-860' (mac=78:C8:81:D7:10:99)
+Type: Info | Timestamp: 2026-05-05 17:47:34.857067+02:00 | Process: ChiakiTV | Library: ChiakiTV.debug.dylib | Subsystem: org.streetpea.chiakitv | Category: session | TID: 0x5906ea
+Starting session request for PS5
+Type: Info | Timestamp: 2026-05-05 17:47:43.432813+02:00 | Process: ChiakiTV | Library: ChiakiTV.debug.dylib | Subsystem: org.streetpea.chiakitv | Category: bridge | TID: 0x591a42
+Trying to request session from 192.168.2.26:9295
+StreamSession: started against 192.168.2.26 (1920x1080 @60fps codec=h265)
+Connected to 192.168.2.26:9295
+Sending session request
+Session request successful
+Starting ctrl
+Ctrl connected to 192.168.2.26:9295
+Sending ctrl request
+Ctrl received http header as response
+Ctrl received ctrl request http response
+Ctrl got Server Type: 2
+Ctrl connected
+CTRL RECEIVED
+     0 00 00 00 01 00 05 00 00 21                      ........!
+Ctrl received Login message: success
+CTRL RECEIVED
+     0 00 00 00 11 00 33 00 00 5a e7 4c b9 57 98 9b 9b .....3..Z.L.W...
+    10 3c 3c 2f 92 c4 e5 41 78 b0                      <</...Ax.
+Received presumably invalid Session Id:
+     0 10 49 6e 76 61 6c 69 64 53 65 73 73 69 6f 6e 49 .InvalidSessionI
+    10 64                                              d
+Received Session Id is too short
+Type: Error | Timestamp: 2026-05-05 17:47:45.488795+02:00
+Ctrl set fallback session Id 171559LZ3K2dxSc875CXiY8k4vkvhR2M2oD6L+ZynhINMFc8Nmyjtq1Wv2qp1nIpGhQntw
+Starting Senkusha
+Takion connecting (version 7)
+Takion enabled Don't Fragment Bit
+Takion sent init
+CTRL RECEIVED
+     0 00 00 00 02 00 16 00 00 75 cd                   ........u.
+Takion received init ack with remote tag 0xb18ccf, outbound streams: 0x64, inbound streams: 0x64
+Takion sent cookie
+Takion received cookie ack
+Takion connected
+Setting takion versions
+Senkusha successfully set takion version
+Senkusha sending big
+Senkusha successfully received bang
+Senkusha Ping Test with count 10 starting
+Senkusha enabled echo
+[…10 ping/pong cycles, RTT ~2.6 ms…]
+Senkusha disabled echo
+Senkusha determined average RTT = 2.673 ms
+Senkusha starting MTU in test with min 576, max 1454, retries 3, timeout 13 ms
+Senkusha MTU request 1454 (min 576, max 1454), id 1, attempt 0
+Senkusha MTU 1454 success
+Senkusha determined inbound MTU 1454
+Senkusha starting MTU out test with min 576, max 1454, retries 3, timeout 13 ms
+Senkusha sent initial client MTU command
+Senkusha received expected Client MTU Command
+Senkusha MTU 1454 out ping attempt 0
+Senkusha MTU ping 1454 success
+Senkusha determined outbound MTU 1454
+Senkusha sending final Client MTU Command
+Senkusha is disconnecting
+Senkusha closed takion
+Senkusha completed successfully
+Takion connecting (version 12)
+Takion enabled Don't Fragment Bit
+Takion sent init
+Takion received init ack with remote tag 0x7033129, outbound streams: 0x64, inbound streams: 0x64
+Takion sent cookie
+Takion received cookie ack
+Takion connected
+StreamConnection sending big
+BANG received
+Crypt has become available. Re-checking MACs of 0 packets
+StreamConnection successfully received bang
+CTRL RECEIVED
+     0 00 00 00 08 00 41 00 00 2d bd 18 85 77 50 56 7a .....A..-...wPVz
+     0 00 00 00 00 02 01 00 00                         ........
+StreamConnection received audio header:
+     0 02 10 00 00 bb 80 00 00 01 e0 00 00 00 01       ..............
+Audio Header:
+  channels = 2
+  bits = 16
+  rate = 48000
+  frame size = 480
+  unknown = 1
+Video Profiles:
+  0: 1920x1080
+StreamConnection successfully received streaminfo
+Setting motion control origin to current position
+AddInstanceForFactory: No factory registered for id <CFUUID 0x6000003318a0> F8BB1C28-BAE8-11D6-9C31-00039315CD46
+Type: Error | Timestamp: 2026-05-05 17:47:45.660054+02:00 | Process: ChiakiTV | Library: CoreFoundation | Subsystem: com.apple.CFBundle | Category: plugin | TID: 0x5906ea
+AudioPlayer: started (rate=48000.0 ch=2 bits=16)
+StreamSession: connected
+Switched to profile 0, resolution: 1920x1080
+         HALC_ProxyIOContext.cpp:1623  HALC_ProxyIOContext::IOWorkLoop: skipping cycle due to overload
+         HALC_ProxyIOContext.cpp:1623  HALC_ProxyIOContext::IOWorkLoop: skipping cycle due to overload
+VideoDecoder: rebuilt session (codec=h265 vps=24B sps=49B pps=7B)
+Type: Info | Timestamp: 2026-05-05 17:47:45.868318+02:00 | Process: ChiakiTV | Library: ChiakiTV.debug.dylib | Subsystem: org.streetpea.chiakitv | Category: video | TID: 0x591acc
+ChiakiTV(78845,0x16f14f000) malloc: double free for ptr 0x1050a3e00
+ChiakiTV(78845,0x16f14f000) malloc: *** set a breakpoint in malloc_error_break to debug
+Type: stdio
+ChiakiTV(78845,0x16f14f000) malloc: double free for ptr 0x1050a3e00
+CoreSimulator 1051.50 - Device: Apple TV 4K (3rd gen) (3BE2A617-E8A2-4E5C-9128-8608E5D97AD5) - Runtime: tvOS 26.4 (23L243a) - DeviceType: Apple TV 4K (3rd generation)
+Type: LLDB
+Debug session ended with code 9: killed
+Type: LLDB

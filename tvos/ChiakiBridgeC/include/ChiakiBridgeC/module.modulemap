@@ -1,0 +1,4 @@
+module ChiakiBridgeC {
+    umbrella header "chiaki_bridge.h"
+    export *
+}

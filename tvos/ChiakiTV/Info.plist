@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>ChiakiTV</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>arm64</string>
+	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>ChiakiTV needs local network access to discover and connect to your PlayStation 5 console.</string>
+	<!-- We own all controller input ourselves: ControllerService forwards
+	     state straight to chiaki, GCEventViewController.controllerUserInteractionEnabled
+	     drains gamepad presses from the focus engine while streaming, and
+	     preferredSystemGestureState = .disabled releases the Guide / PS button.
+	     Setting this key true (the default) makes tvOS treat the app as one
+	     that wants the system to handle controller events including the Guide
+	     button → Control Center. Set false here to fully claim the controller. -->
+	<key>GCSupportsControllerUserInteraction</key>
+	<false/>
+	<!-- GCSupportedGameControllers is intentionally omitted. Filtering to
+	     just "ExtendedGamepad" produced a stripped-down button set
+	     (vendorName="Gamepad", no Touchpad / Share / Home) — the diagnostic
+	     log on first run captured Button A/B/X/Y/Menu/dpad/sticks/triggers
+	     only. Without the filter, tvOS exposes the controller through its
+	     richest available profile (GCDualSenseGamepad, GCXboxGamepad), which
+	     surfaces the vendor-specific inputs we need for in-stream actions. -->
+
+</dict>
+</plist>

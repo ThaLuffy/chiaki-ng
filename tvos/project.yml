@@ -1,0 +1,195 @@
+# XcodeGen Project Specification — ChiakiTV (chiaki-ng tvOS port)
+#
+# Generate with: xcodegen generate
+# Install XcodeGen: brew install xcodegen
+#
+# This spec produces ChiakiTV.xcodeproj. The generated project is gitignored;
+# always regenerate from this file. Do not edit the .xcodeproj by hand.
+#
+# Note: in Phase 0 (scaffolding), the upstream chiaki-lib + its dependencies are
+# NOT yet wired in. The ChiakiTV target builds against ChiakiBridgeC stubs only.
+# Phase 1 will add the chiaki-lib XCFramework (or static lib) reference.
+
+name: ChiakiTV
+
+options:
+  bundleIdPrefix: org.streetpea.chiakitv
+  deploymentTarget:
+    tvOS: "17.0"
+  xcodeVersion: "15.0"
+  generateEmptyDirectories: true
+  groupSortPosition: top
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    TARGETED_DEVICE_FAMILY: 3  # Apple TV
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    CLANG_CXX_LANGUAGE_STANDARD: "c++17"
+    GCC_C_LANGUAGE_STANDARD: "c11"
+    # We only ship arm64 — Apple TV 4K 3rd gen is A15 Bionic; the simulator
+    # on Apple Silicon Macs runs arm64 too. Vendored chiaki-lib + deps only
+    # have arm64 slices, so x86_64 would fail at link time anyway.
+    ARCHS: arm64
+    VALID_ARCHS: arm64
+    EXCLUDED_ARCHS: x86_64
+    ONLY_ACTIVE_ARCH: NO
+
+configs:
+  Debug: debug
+  Release: release
+
+targets:
+
+  # ─── C Bridge (thin Swift ↔ chiaki-lib glue) ────────────────────────
+  # Phase 0: stub only. Phase 1 will link against the chiaki-lib static
+  # archive built for tvOS arm64.
+  ChiakiBridgeC:
+    type: library.static
+    platform: tvOS
+    sources:
+      - path: ChiakiBridgeC/src
+        type: group
+      - path: ChiakiBridgeC/include
+        type: group
+        buildPhase: headers
+    settings:
+      base:
+        HEADER_SEARCH_PATHS:
+          - $(SRCROOT)/ChiakiBridgeC/include
+        MODULEMAP_FILE: $(SRCROOT)/ChiakiBridgeC/include/ChiakiBridgeC/module.modulemap
+        DEFINES_MODULE: NO
+        CLANG_ENABLE_MODULES: YES
+        # Per-SDK include path for chiaki-lib + its deps.
+        "HEADER_SEARCH_PATHS[sdk=appletvos*]":
+          - $(SRCROOT)/ChiakiBridgeC/include
+          - $(SRCROOT)/Vendors/prefix/appletvos/include
+        "HEADER_SEARCH_PATHS[sdk=appletvsimulator*]":
+          - $(SRCROOT)/ChiakiBridgeC/include
+          - $(SRCROOT)/Vendors/prefix/appletvsimulator/include
+
+  # ─── Main tvOS Application ───────────────────────────────────────────
+  ChiakiTV:
+    type: application
+    platform: tvOS
+    sources:
+      - path: ChiakiTV
+        excludes:
+          - "**/*.plist"
+          - "**/*.entitlements"
+      - path: ChiakiTV/Resources
+        buildPhase: resources
+    dependencies:
+      - target: ChiakiBridgeC
+      - sdk: VideoToolbox.framework
+      - sdk: Metal.framework
+      - sdk: MetalKit.framework
+      - sdk: CoreVideo.framework
+      - sdk: CoreMedia.framework
+      - sdk: GameController.framework
+      - sdk: AVFoundation.framework
+      - sdk: AVKit.framework
+      - sdk: CoreHaptics.framework
+      - sdk: Network.framework
+      - sdk: CryptoKit.framework
+      - sdk: Accelerate.framework
+    settings:
+      base:
+        # Set your team via Xcode → Signing & Capabilities (or override here).
+        DEVELOPMENT_TEAM: 77CY538D7V
+        PRODUCT_BUNDLE_IDENTIFIER: org.streetpea.chiakitv.app
+        INFOPLIST_FILE: ChiakiTV/Info.plist
+        CODE_SIGN_ENTITLEMENTS: ChiakiTV/ChiakiTV.entitlements
+        SWIFT_OBJC_BRIDGING_HEADER: ""
+        LD_RUNPATH_SEARCH_PATHS:
+          - "@executable_path/Frameworks"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # Vendored chiaki-lib + transitive C deps. Built by
+        # `tvos/scripts/build-deps-tvos.sh all` into Vendors/prefix/<slice>/.
+        "LIBRARY_SEARCH_PATHS[sdk=appletvos*]":
+          - $(SRCROOT)/Vendors/prefix/appletvos/lib
+        "LIBRARY_SEARCH_PATHS[sdk=appletvsimulator*]":
+          - $(SRCROOT)/Vendors/prefix/appletvsimulator/lib
+        # Order matters — chiaki depends on the rest, so list it first so
+        # the linker sees the dangling refs before the symbol-providers.
+        OTHER_LDFLAGS:
+          - -lchiaki
+          - -ljerasure
+          - -lgf_complete
+          - -lprotobuf-nanopb
+          - -lcurl
+          - -lopus
+          - -ljson-c
+          - -levent
+          - -levent_core
+          - -levent_extra
+          - -levent_pthreads
+          - -levent_openssl
+          - -lminiupnpc
+          - -lssl
+          - -lcrypto
+          - -lz
+      configs:
+        Debug:
+          SWIFT_OPTIMIZATION_LEVEL: "-Onone"
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+        Release:
+          SWIFT_OPTIMIZATION_LEVEL: "-O"
+          SWIFT_COMPILATION_MODE: wholemodule
+
+  # ─── C Bridge Tests ──────────────────────────────────────────────────
+  ChiakiBridgeCTests:
+    type: bundle.unit-test
+    platform: tvOS
+    sources:
+      - path: Tests/ChiakiBridgeCTests
+    dependencies:
+      - target: ChiakiBridgeC
+    settings:
+      base:
+        HEADER_SEARCH_PATHS:
+          - $(SRCROOT)/ChiakiBridgeC/include
+        SWIFT_INCLUDE_PATHS:
+          - $(SRCROOT)/ChiakiBridgeC/include/ChiakiBridgeC
+
+  # ─── Swift App Tests ─────────────────────────────────────────────────
+  ChiakiTVTests:
+    type: bundle.unit-test
+    platform: tvOS
+    sources:
+      - path: Tests/ChiakiTVTests
+    dependencies:
+      - target: ChiakiTV
+      - target: ChiakiBridgeC
+    settings:
+      base:
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/ChiakiTV.app/ChiakiTV"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        GENERATE_INFOPLIST_FILE: YES
+        DEVELOPMENT_TEAM: 77CY538D7V
+        PRODUCT_BUNDLE_IDENTIFIER: org.streetpea.chiakitv.tests
+        # Same per-SDK include + lib paths as ChiakiTV — the test bundle
+        # statically links the same chiaki-lib + deps so it can call into
+        # the bridge directly.
+        "LIBRARY_SEARCH_PATHS[sdk=appletvos*]":
+          - $(SRCROOT)/Vendors/prefix/appletvos/lib
+        "LIBRARY_SEARCH_PATHS[sdk=appletvsimulator*]":
+          - $(SRCROOT)/Vendors/prefix/appletvsimulator/lib
+        OTHER_LDFLAGS:
+          - -lchiaki
+          - -ljerasure
+          - -lgf_complete
+          - -lprotobuf-nanopb
+          - -lcurl
+          - -lopus
+          - -ljson-c
+          - -levent
+          - -levent_core
+          - -levent_extra
+          - -levent_pthreads
+          - -levent_openssl
+          - -lminiupnpc
+          - -lssl
+          - -lcrypto
+          - -lz

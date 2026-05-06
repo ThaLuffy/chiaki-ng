@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+		For a personal-use development build distributed via TestFlight or
+		direct sideload, com.apple.developer.networking.multicast is not
+		required since UDP unicast is sufficient for the manual-host-entry
+		path. UDP broadcast for discovery (lib/src/discovery.c:213) does
+		work without the entitlement on tvOS for now, but Apple may close
+		this gap — if discovery starts failing in a future tvOS release,
+		this entitlement key needs to be added (it requires Apple approval
+		for App Store distribution; for personal/dev builds it can be
+		toggled on if you have the entitlement granted on your developer
+		account).
+	-->
+</dict>
+</plist>
