@@ -79,6 +79,8 @@ These are the rules every change is audited against.
 |---|---|
 | [`latency-strategy.md`](./docs/optimization/latency-strategy.md) | Latency budget, where the bridge cost is, why we don't add buffering |
 | [`network-optimization.md`](./docs/optimization/network-optimization.md) | Socket buffer sizing, Wi-Fi 6 tuning, ECN/DSCP marking |
+| [`native-alternatives.md`](./docs/optimization/native-alternatives.md) | Per-subsystem audit of chiaki-lib vs. Apple-native alternatives — what to keep, what to swap, what to upstream. The OpenSSL `no-asm` finding is the single biggest opportunity. |
+| [`native-alternatives-latency-first.md`](./docs/optimization/native-alternatives-latency-first.md) | Aggressive latency-first re-audit (wired LAN + 4K60 HDR). Every `lib/src/*.c` file gets a verdict; identifies five tvOS-side wins + five upstream-PR opportunities including the per-packet `EVP_CIPHER_CTX` malloc and the 8 ms input-latency floor in `feedbacksender.c`. |
 
 ### Reference — [`docs/reference/`](./docs/reference/)
 
