@@ -79,13 +79,18 @@ final class ModelCodableTests: XCTestCase {
 
     func testAppSettingsKnownDefaults() {
         // Anchor a few documented defaults so accidental changes are flagged.
+        // Personal-use scope: Apple TV 4K 3rd gen + PS5 + DualSense at 4K60 HDR
+        // (see ../CLAUDE.md and docs/phases.md Phase 2).
         let s = AppSettings()
         XCTAssertEqual(s.audioBufferMs, 80,
                        "Audio buffer default is 80ms — see docs/architecture/audio-pipeline.md")
-        XCTAssertEqual(s.bitrateKbps, 15_000)
+        XCTAssertEqual(s.bitrateKbps, 30_000,
+                       "30 Mbps default for 4K60 HEVC HDR — see docs/phases.md Phase 2.")
         XCTAssertEqual(s.fps, .fps60)
-        XCTAssertEqual(s.resolution, .res1080p)
-        XCTAssertEqual(s.codec, .h265)
+        XCTAssertEqual(s.resolution, .res2160p,
+                       "Default resolution is 2160p (4K) — personal-use Apple TV 4K target.")
+        XCTAssertEqual(s.codec, .h265hdr,
+                       "Default codec is H.265 HDR — personal-use Apple TV 4K HDR target.")
         XCTAssertEqual(s.renderPreset, .highQuality)
         XCTAssertEqual(s.audioVolume, 100)
         XCTAssertTrue(s.verticalSync)

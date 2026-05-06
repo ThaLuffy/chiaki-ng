@@ -143,7 +143,7 @@ final class PersistenceTests: XCTestCase {
 
     func testAppStateAutoSavesSettingsOnMutation() {
         let state = AppState()
-        XCTAssertEqual(state.settings.bitrateKbps, 15_000)
+        XCTAssertEqual(state.settings.bitrateKbps, 30_000)
 
         state.settings.bitrateKbps = 22_500
 
