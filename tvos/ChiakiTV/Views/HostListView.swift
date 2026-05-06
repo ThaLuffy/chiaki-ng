@@ -64,8 +64,9 @@ struct HostListView: View {
                 appState.showSettings()
             } label: {
                 Image(systemName: "gearshape.fill")
-                    .font(.system(size: 24, weight: .medium))
-                    .frame(width: 72, height: 72)
+                    .font(.system(size: 22, weight: .medium))
+                    .padding(.horizontal, Theme.space5)
+                    .padding(.vertical, Theme.space4)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.borderless)
