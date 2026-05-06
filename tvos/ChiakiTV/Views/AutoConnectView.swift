@@ -2,16 +2,13 @@
 
 import SwiftUI
 
-/// Wake-on-LAN waiting room. Mirrors
-/// [`gui/src/qml/AutoConnectView.qml`](../../../gui/src/qml/AutoConnectView.qml):
+/// Wake-on-LAN waiting room. Reskinned per
+/// [`docs/ui/redesign-plan.md`](../../docs/ui/redesign-plan.md):
+/// atmospheric ink background, centered modal-style card with the
+/// destination host's nickname + IP, and an amber spinner so the
+/// "alive" cue matches the rest of the redesign.
 ///
-/// - Full-bleed black background.
-/// - Centered "Waiting for console..." label, opacity 0 → 1 over 250 ms once
-///   the `allowClose` flag flips at t = 1500 ms.
-/// - 70 × 70 spinner pinned slightly below center.
-/// - Helper label below the spinner: "Press <Circle/B> to cancel connection".
-///
-/// Lifecycle:
+/// Lifecycle (unchanged from prior implementation):
 ///   1. `HostListView.connect(to:)` sends the WoL packet then routes here
 ///      with the target host's MAC.
 ///   2. We watch `appState.hosts` for that MAC. As soon as DiscoveryService
@@ -29,35 +26,64 @@ struct AutoConnectView: View {
 
     @State private var allowClose = false
 
-    /// Hard ceiling on how long we sit on this screen before giving up.
-    /// PS5 wake-from-standby is typically 5–15 s; 30 s gives generous headroom
-    /// without leaving the user staring at a frozen spinner forever.
     private let failTimeout: Duration = .seconds(30)
+
+    private var targetHost: RegisteredHost? {
+        appState.registeredHosts.first(where: { $0.id == hostId })
+    }
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
-
-            VStack(spacing: 30) {
-                Text("Waiting for console…")
-                    .font(.system(size: Theme.dialogTitleFontSize, weight: .bold))
-                    .foregroundStyle(Theme.primaryText)
-                    .opacity(allowClose ? 1.0 : 0.0)
-                    .animation(.easeInOut(duration: Theme.streamLoadFade),
-                               value: allowClose)
-
+            VStack(spacing: 36) {
                 ChiakiSpinner()
+                    .frame(width: 110, height: 110)
 
-                Text("Press B / Circle to cancel")
-                    .font(.system(size: Theme.dialogHeaderFontSize))
-                    .foregroundStyle(Theme.tertiaryText)
-                    .padding(.top, 10)
+                VStack(spacing: 8) {
+                    Text("Waking PS5")
+                        .font(Theme.font(.displaySmall))
+                        .foregroundStyle(Theme.white50)
+
+                    if let host = targetHost {
+                        Text(host.nickname)
+                            .font(Theme.font(.titleMed))
+                            .foregroundStyle(Theme.amber500)
+                        Text(host.lastIpAddress)
+                            .font(Theme.font(.monoMed))
+                            .foregroundStyle(Theme.mist500)
+                    } else {
+                        Text("Waiting for the console to report ready…")
+                            .font(Theme.font(.bodyMed))
+                            .foregroundStyle(Theme.mist500)
+                    }
+                }
+                .opacity(allowClose ? 1.0 : 0.0)
+                .animation(.easeInOut(duration: Theme.streamLoadFade),
+                           value: allowClose)
+
+                Text("Press Menu or Circle to cancel")
+                    .font(Theme.font(.bodySmall))
+                    .foregroundStyle(Theme.mist500)
+                    .opacity(allowClose ? 1.0 : 0.0)
+                    .animation(.easeInOut(duration: Theme.streamLoadFade)
+                                .delay(0.15),
+                               value: allowClose)
             }
+            .padding(48)
+            .frame(maxWidth: 720)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.modalCorner,
+                                 style: .continuous)
+                    .fill(Theme.ink800)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.modalCorner,
+                                 style: .continuous)
+                    .stroke(Theme.amber500.opacity(0.3), lineWidth: 1)
+            )
+            .shadow(color: Theme.amberGlow, radius: 60, x: 0, y: 0)
         }
-        // `.focusable()` gives the focus engine a target inside this view.
-        // Without it, B/Circle/Menu presses escape the responder chain and
-        // tvOS interprets them as "exit the app." With it, the press lands
-        // here and `.onExitCommand` fires reliably.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .chiakiBackground()
         .focusable()
         .task {
             try? await Task.sleep(for: .milliseconds(1500))
@@ -65,9 +91,6 @@ struct AutoConnectView: View {
             allowClose = true
         }
         .task(id: hostId) {
-            // Observe discovery state for our target host. As soon as it
-            // shows up as `.ready` and we still have a registered record
-            // for it, promote to streaming.
             let deadline = ContinuousClock.now.advanced(by: failTimeout)
             while ContinuousClock.now < deadline {
                 if let host = appState.hosts.first(where: { $0.id == hostId }),
@@ -79,7 +102,6 @@ struct AutoConnectView: View {
                 try? await Task.sleep(for: .milliseconds(500))
                 if Task.isCancelled { return }
             }
-            // Timed out — fall back to host list so the user isn't stuck.
             if !Task.isCancelled {
                 appState.showHostList()
             }

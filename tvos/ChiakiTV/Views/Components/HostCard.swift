@@ -33,6 +33,11 @@ struct HostCard: View {
     @FocusState private var focused: Action?
     private var cardFocused: Bool { focused != nil }
 
+    /// Drives the discovery-bloom — on first appearance the card briefly
+    /// outsets an amber halo before settling into its rest state. Visual
+    /// chain of causation: "we just found this PS5". Per redesign-plan §6.
+    @State private var bloomActive = false
+
     var body: some View {
         HStack(spacing: 0) {
             consolePortrait
@@ -47,19 +52,33 @@ struct HostCard: View {
         .frame(width: Theme.hostCardWidth, height: Theme.hostCardHeight)
         .background(cardBackground)
         .overlay(rimBorder)
-        .shadow(color: rimColor.opacity(cardFocused ? 0.45 : 0.18),
-                radius: cardFocused ? 40 : 22, x: 0, y: 0)
+        .shadow(color: rimColor.opacity(shadowOpacity),
+                radius: shadowRadius, x: 0, y: 0)
         .focusSection()
-        // Default focus: CONNECT, every time the card materialises. Per
-        // docs/ui/redesign-plan.md §5.1 ("Initial focus: the CONNECT button
-        // on the host card. Auto-focus, every launch."). Without this, the
-        // focus engine lands on whatever happens to be spatially closest to
-        // the previous focus target — usually the bottom-left wifi pill on
-        // first launch. The user-visible result is a Connect-press
-        // requiring at least one navigation D-pad press, which is the
-        // single most-frequent action in the app.
         .defaultFocus($focused, .connect)
         .animation(Theme.focusSpring, value: cardFocused)
+        .animation(.easeOut(duration: 0.62), value: bloomActive)
+        .onAppear {
+            // Two-stage: bloom on for 380ms, then settle. The .easeOut on
+            // bloomActive carries the shadow opacity/radius values back
+            // down to their resting values smoothly.
+            bloomActive = true
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(380))
+                bloomActive = false
+            }
+        }
+    }
+
+    /// Combined shadow-opacity ramp: focused state + bloom both contribute.
+    private var shadowOpacity: Double {
+        if bloomActive { return 0.65 }
+        return cardFocused ? 0.45 : 0.18
+    }
+
+    private var shadowRadius: CGFloat {
+        if bloomActive { return 56 }
+        return cardFocused ? 40 : 22
     }
 
     // MARK: - Console portrait

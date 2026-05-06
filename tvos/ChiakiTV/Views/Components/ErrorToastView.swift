@@ -2,14 +2,10 @@
 
 import SwiftUI
 
-/// Bottom-center error toast. Mirrors the toast in
-/// [`gui/src/qml/Main.qml:404-432`](../../../../gui/src/qml/Main.qml):
-///
-/// - Anchored bottom-center, `bottomMargin 30`.
-/// - 24 px bold title, 20 px body.
-/// - Background `Material.accent` (`Theme.accent`), 8 px radius (Medium scale).
-/// - Opacity ramps `0 → 0.8` over 500 ms; auto-dismiss after 2 s
-///   ([`Main.qml:430` `errorHideTimer`](../../../../gui/src/qml/Main.qml)).
+/// Bottom-center error toast. Reskinned per the redesign tokens:
+/// rose-tinted (errors are *errors*, not the ambient amber action color),
+/// a leading triangle glyph for at-distance recognition, drop-shadow for
+/// elevation off the canvas. Auto-dismisses after 2 s.
 struct ErrorToastView: View {
     let title: String
     let message: String
@@ -20,29 +16,42 @@ struct ErrorToastView: View {
     var body: some View {
         VStack {
             Spacer()
-            VStack(spacing: 6) {
-                Text(title)
-                    .font(.system(size: Theme.errorTitleFontSize, weight: .bold))
-                Text(message)
-                    .font(.system(size: Theme.errorTextFontSize))
-                    .multilineTextAlignment(.center)
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(Theme.rose500)
+                    .padding(.top, 4)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(Theme.font(.titleMed).weight(.semibold))
+                        .foregroundStyle(Theme.white50)
+                    Text(message)
+                        .font(Theme.font(.bodyMed))
+                        .foregroundStyle(Theme.mist300)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
-            .foregroundStyle(Theme.primaryText)
-            .padding(.horizontal, Theme.toastInsetH)
-            .padding(.vertical, Theme.toastInsetV)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 18)
+            .frame(maxWidth: 720, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: Theme.mediumRadius)
-                    .fill(Theme.accent.opacity(0.8))
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Theme.ink800)
             )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Theme.rose500.opacity(0.6), lineWidth: 1.5)
+            )
+            .shadow(color: Theme.rose500.opacity(0.3), radius: 24, x: 0, y: 0)
             .padding(.bottom, Theme.toastBottomMargin)
             .opacity(visible ? 1.0 : 0.0)
-            .animation(.easeInOut(duration: Theme.toastFadeDuration), value: visible)
+            .scaleEffect(visible ? 1.0 : 0.95)
+            .animation(.easeOut(duration: Theme.toastFadeDuration), value: visible)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .allowsHitTesting(false)
-        // `.task` cancels on view disappear, so the dismissal timer can't
-        // fire after the toast has already been removed (the previous
-        // `DispatchQueue.main.asyncAfter` chain leaked in that scenario).
         .task {
             visible = true
             try? await Task.sleep(for: .seconds(2))
