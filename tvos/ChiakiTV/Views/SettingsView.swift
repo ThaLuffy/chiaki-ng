@@ -309,33 +309,27 @@ private struct ConsolesTab: View {
     @Environment(AppState.self) private var appState
 
     var body: some View {
-        if appState.registeredHosts.isEmpty {
-            // SwiftUI's canonical empty-state pattern: ContentUnavailableView
-            // with an `actions:` block. When the list is empty, we drop the
-            // Form chrome entirely so the empty state can center properly
-            // (Form rows force leading text alignment and break the
-            // ContentUnavailableView's centered layout).
-            ContentUnavailableView {
-                Label("No registered consoles", systemImage: "gamecontroller")
-            } description: {
-                Text("Pair a PS5 to use Remote Play without re-entering a PIN every time.")
-            } actions: {
-                Button {
-                    appState.showRegistration(for: Host(
-                        id: UUID().uuidString,
-                        nickname: "New PS5",
-                        ipAddress: ""
-                    ))
-                } label: {
-                    Label("Register a new console", systemImage: "plus.circle.fill")
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            Form {
-                Section {
+        Form {
+            Section {
+                if appState.registeredHosts.isEmpty {
+                    // Empty-state row inside the same Form chrome as the
+                    // populated state — keeps the visual rhythm matching
+                    // every other Settings tab (Form { Section { ... } }
+                    // with header + rows).
+                    VStack(alignment: .leading, spacing: Theme.space2) {
+                        Text("No registered consoles")
+                            .font(.system(.body).weight(.semibold))
+                        Text("Pair a PS5 to use Remote Play without re-entering a PIN every time.")
+                            .font(.system(.footnote))
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, Theme.space2)
+                    .listRowBackground(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color.white.opacity(0.05))
+                    )
+                } else {
                     ForEach(appState.registeredHosts) { host in
                         SettingsRow(host.nickname, valueInset: 2) {
                             HStack(spacing: Theme.space5) {
@@ -355,29 +349,31 @@ private struct ConsolesTab: View {
                             }
                         }
                     }
-                } header: {
-                    Text("Registered consoles")
                 }
-
-                Section {
-                    Button {
-                        appState.showRegistration(for: Host(
-                            id: UUID().uuidString,
-                            nickname: "New PS5",
-                            ipAddress: ""
-                        ))
-                    } label: {
-                        Label("Register a new console",
-                              systemImage: "plus.circle.fill")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .listRowBackground(Color.clear)
-                }
+            } header: {
+                Text("Registered consoles")
+            } footer: {
+                Text("A registered PS5 can be reached without entering its PIN every time.")
             }
-            .formStyle(.grouped)
+
+            Section {
+                Button {
+                    appState.showRegistration(for: Host(
+                        id: UUID().uuidString,
+                        nickname: "New PS5",
+                        ipAddress: ""
+                    ))
+                } label: {
+                    Label("Register a new console",
+                          systemImage: "plus.circle.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .listRowBackground(Color.clear)
+            }
         }
+        .formStyle(.grouped)
     }
 }
 
