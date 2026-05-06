@@ -65,13 +65,16 @@ struct HostCard: View {
         .modifier(PulseShadow(active: host.state == .ready && !reduceMotion,
                               cardFocused: cardFocused,
                               rimColor: rimColor))
-        // No `.focusSection()` — per `swiftui-skills:focus-engine`,
-        // sections are only needed when default directional movement
-        // *skips* the intended group. Action row buttons are evenly
-        // adjacent so default routing reaches them. Wrapping the card
-        // in a section was making Right-from-Connect jump up to the
-        // toolbar instead of right to Hide, because the section's
-        // boundary preferred a sibling section over an internal button.
+        // The card itself is a focus section so tvOS treats it as a
+        // single destination from the toolbar's Down arrow — without
+        // this the engine couldn't find the action row buttons (which
+        // sit at the bottom of the card, far from the toolbar). The
+        // inner action-row section (see `actionRow`) keeps Left/Right
+        // navigation between Connect/Hide working correctly.
+        // Per `swiftui-skills:focus-engine`: sections guide directional
+        // movement across groups; nested sections give us "card as a
+        // destination" + "row as the row layout".
+        .focusSection()
         .defaultFocus($focused, .connect)
         .animation(.smooth(duration: 0.28), value: cardFocused)
     }
