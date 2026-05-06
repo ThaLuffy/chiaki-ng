@@ -1,103 +1,89 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //
-// Design tokens for ChiakiTV. The values here are the source of truth for
-// color, type, spacing, and motion across the app — Apple's HIG defaults are
-// avoided so the app reads as itself, not as a stock SwiftUI sample.
+// Design tokens for ChiakiTV.
 //
-// Companion docs:
-//   - docs/ui/redesign-plan.md   the why behind every token below.
-//   - docs/ui/original-gui-spec.md   the upstream desktop spec we *no longer*
-//     mirror 1:1 — kept for historical mapping only.
+// Philosophy after redesign-v2: lean on SwiftUI's semantic system whenever
+// possible. Brand color tokens stay (they carry meaning the system can't
+// infer); raw point sizes go (they break Dynamic Type); hardcoded layout
+// dimensions go (they fight content-driven sizing). The `applyTheme()`
+// modifier wires `.accentColor` once at the root so every system control
+// (Toggle, Picker(.segmented), Slider, .buttonStyle(.card)) inherits the
+// brand amber automatically.
+//
+// See docs/ui/redesign-v2-report.md for rationale and implementation order.
 
 import SwiftUI
 
 enum Theme {
 
-    // MARK: - Color tokens (ink + amber)
+    // MARK: - Brand color tokens
     //
-    // Two families. INK is the dark base — every surface, every background.
-    // AMBER is the primary action accent — focus halos, primary buttons,
-    // confirm-state highlights. PS_BLUE is reserved for PlayStation-context
-    // cues only (the console-ready glyph, the system imagery hook). Status
-    // colors (rose, green) are for destructive / success states.
+    // These carry meaning the system can't infer:
+    // - Amber is the action accent (primary button, focus emphasis).
+    // - PS Blue is reserved for PlayStation-context cues only.
+    // - Rose is destructive, Green is success — distinct from system
+    //   .red / .green which adapt to user vibrancy settings unpredictably.
+    // - Ink is the cinema-room base; neutral semantic colors for text
+    //   come from `Color.primary` / `.secondary`.
 
     /// Deep ink — the app background base.
     static let ink900 = Color(red: 0.031, green: 0.063, blue: 0.102)   // #08101A
-    /// Elevated panels — host card, settings rows.
+    /// Elevated panels — host card, list rows. Used as a fill *under*
+    /// `.regularMaterial` for elevated surfaces.
     static let ink800 = Color(red: 0.059, green: 0.102, blue: 0.165)   // #0F1A2A
-    /// Hover/focus background fill.
+    /// Hover/focus background fill on quiet surfaces.
     static let ink700 = Color(red: 0.106, green: 0.161, blue: 0.251)   // #1B2940
-    /// Borders, dividers, deselected segmented-control fill.
+    /// Borders, dividers.
     static let ink600 = Color(red: 0.165, green: 0.227, blue: 0.333)   // #2A3A55
 
-    /// Secondary text, scan-line indicators.
-    static let mist500 = Color(red: 0.580, green: 0.639, blue: 0.722)  // #94A3B8
-    /// Primary body text on dark.
-    static let mist300 = Color(red: 0.796, green: 0.835, blue: 0.882)  // #CBD5E1
-    /// Emphasised primary text, focus halo highlights.
-    static let white50 = Color(red: 0.973, green: 0.980, blue: 0.988)  // #F8FAFC
-
-    /// Primary action — `CONNECT` button fill, focus rings.
+    /// Primary action — `CONNECT` button, focus emphasis.
     static let amber500 = Color(red: 0.961, green: 0.620, blue: 0.043) // #F59E0B
     /// Primary action hover/focus inner highlight.
     static let amber400 = Color(red: 0.984, green: 0.749, blue: 0.141) // #FBBF24
-    /// 35% amber bloom — focus halo shadow.
+    /// 35% amber bloom — soft outer glow.
     static let amberGlow = Color(red: 0.961, green: 0.620, blue: 0.043).opacity(0.35)
 
     /// PlayStation-context only — console-ready state, system imagery.
     static let psBlue = Color(red: 0.145, green: 0.388, blue: 0.922)   // #2563EB
 
-    /// Destructive action (Hide/Forget confirm, error toasts).
+    /// Destructive (Hide / Forget confirm, error toasts).
     static let rose500 = Color(red: 0.957, green: 0.247, blue: 0.369)  // #F43F5E
     /// Ready / success state.
     static let green500 = Color(red: 0.063, green: 0.725, blue: 0.506) // #10B981
 
-    // MARK: - Legacy aliases (still in use; will retire as components migrate)
+    // MARK: - Legacy aliases
     //
-    // Today every component reads `Theme.accent` for its focus ring + primary
-    // highlight. Repointing the alias is how Step 1 of the redesign flips the
-    // entire app from cool-blue chrome to amber chrome in one commit. The
-    // alias stays so we don't have to chase 30+ call sites in the same change.
+    // Some pre-redesign components still read these. They'll retire as the
+    // remaining migrations land, but in the meantime keeping the aliases
+    // means a chrome change here propagates everywhere.
 
-    /// Primary action / focus accent. Was `#00a7ff` (cool blue, mirrored from
-    /// the Qt Material Dark theme). Now amber per docs/ui/redesign-plan.md §3.
-    static let accent = amber500
-
-    /// App background base. Was `#303030`. Now ink-900.
-    static let background = ink900
-
-    /// Elevated surface (toolbars, dialog bg). Was `#424242`. Now ink-800.
-    static let surface = ink800
-
-    /// In-stream menu bar background. Distinct from `surface` only because the
-    /// stream HUD already shipped its own visual language; preserve it.
+    static let accent           = amber500
+    static let background       = ink900
+    static let surface          = ink800
     static let streamMenuSurface = Color(red: 0.169, green: 0.169, blue: 0.169)
+    static let primaryText      = Color.primary
+    static let secondaryText    = Color.secondary
+    static let tertiaryText     = Color.secondary.opacity(0.7)
+    static let errorRed         = rose500
 
-    static let primaryText   = mist300
-    static let secondaryText = mist300.opacity(0.7)
-    static let tertiaryText  = mist300.opacity(0.45)
+    /// Semantic stand-in tokens for components that pre-date the dynamic-type
+    /// migration. New code should reach for `Color.primary` / `.secondary`
+    /// directly.
+    static let mist300 = Color.primary           // primary body on dark
+    static let mist500 = Color.secondary         // secondary
+    static let white50 = Color.white             // emphasised on dark surfaces
 
-    /// Packet-loss + dropped-frame counters in the stream HUD.
-    static let errorRed = rose500
-
-    // MARK: - Spacing — current implementation
+    // MARK: - Spacing — pre-redesign components still in use
     //
-    // Tokens sized for the in-flight HostTile / SettingsView etc. They stay
-    // valid until those components migrate to the redesigned Host Card and
-    // settings rail. New layout tokens for the redesign live below.
+    // These power the in-stream HUD and a few legacy chrome surfaces. Don't
+    // add new tokens of this shape; new code should rely on adaptive
+    // spacing or content-driven layout.
 
     static let toolbarHeight:          CGFloat = 80
     static let dialogTopMargin:        CGFloat = 20
     static let dialogColumnSpacing:    CGFloat = 20
     static let dialogRowSpacing:       CGFloat = 20
     static let dialogFieldWidth:       CGFloat = 400
-
-    static let hostTileHeight:         CGFloat = 180
-    static let hostTileLeftMargin:     CGFloat = 30
-    static let hostTileRightMargin:    CGFloat = 10
-    static let hostTileVerticalMargin: CGFloat = 10
-    static let hostTileSubitemSpacing: CGFloat = 50
-    static let consoleIconWidth:       CGFloat = 150
 
     static let smallIconSize:          CGFloat = 28
     static let largeIconSize:          CGFloat = 50
@@ -106,89 +92,113 @@ enum Theme {
     static let toastInsetH:            CGFloat = 20
     static let toastInsetV:            CGFloat = 10
 
-    // MARK: - Spacing — redesign (forthcoming components)
+    // MARK: - Typography — semantic font roles
+    //
+    // Each role maps to a SwiftUI semantic font style. Semantic fonts scale
+    // with Dynamic Type automatically — the user's accessibility text-size
+    // setting flows through every label.
+    //
+    // Why the indirection (`Theme.font(role:)`) when the body could just call
+    // `.font(.title2)` directly? Two reasons:
+    //
+    // 1. The role names map to *intent* (display, sectionTitle, hint), not
+    //    to system-font names. We can swap the underlying mapping in one
+    //    place without touching call sites.
+    // 2. We can layer brand styling (Inter Display, JetBrains Mono) at this
+    //    seam in a future commit without changing role values.
 
-    /// Hero Host Card outer dimensions (single-console steady state).
+    enum FontRole {
+        // New semantic roles (use these in new code).
+        case display       // Hero — host nickname on the Host Card
+        case heading       // Sheet titles, screen titles
+        case sectionTitle  // Tab section dividers
+        case body          // Default body text
+        case bodyEmph      // Emphasised body
+        case footnote      // Hints, captions
+        case mono          // Tabular numerics (IP, MAC, bitrate readouts)
+        case monoCaption   // Caption-side labels (HOST / ID / ADDRESS)
+
+        // Legacy roles (in-flight components; retire as their owners
+        // migrate to system primitives in v2 implementation steps).
+        case displayXL, displayLarge, displayMed, displaySmall
+        case titleLarge, titleMed
+        case bodyLarge, bodyMed, bodySmall
+        case caption
+        case monoLarge, monoMed, monoSmall
+    }
+
+    /// Resolves a FontRole to a SwiftUI Font. Semantic styles only — every
+    /// returned Font scales with the user's Dynamic Type setting.
+    static func font(_ role: FontRole) -> Font {
+        switch role {
+        // New roles
+        case .display:      return .system(.largeTitle, design: .default).bold()
+        case .heading:      return .system(.title2,     design: .default).weight(.semibold)
+        case .sectionTitle: return .system(.title3,     design: .default).weight(.semibold)
+        case .body:         return .system(.body,       design: .default)
+        case .bodyEmph:     return .system(.body,       design: .default).weight(.medium)
+        case .footnote:     return .system(.footnote,   design: .default)
+        case .mono:         return .system(.body,       design: .monospaced)
+        case .monoCaption:  return .system(.footnote,   design: .monospaced).weight(.semibold)
+
+        // Legacy mappings — collapse to semantic styles where possible.
+        case .displayXL:    return .system(.largeTitle, design: .default).weight(.heavy)
+        case .displayLarge: return .system(.largeTitle, design: .default).bold()
+        case .displayMed:   return .system(.title,      design: .default).weight(.semibold)
+        case .displaySmall: return .system(.title2,     design: .default).weight(.semibold)
+        case .titleLarge:   return .system(.title2,     design: .default).weight(.semibold)
+        case .titleMed:     return .system(.title3,     design: .default).weight(.medium)
+        case .bodyLarge:    return .system(.body,       design: .default)
+        case .bodyMed:      return .system(.body,       design: .default)
+        case .bodySmall:    return .system(.callout,    design: .default)
+        case .caption:      return .system(.footnote,   design: .default).weight(.medium)
+        case .monoLarge:    return .system(.title3,     design: .monospaced)
+        case .monoMed:      return .system(.body,       design: .monospaced)
+        case .monoSmall:    return .system(.footnote,   design: .monospaced).weight(.medium)
+        }
+    }
+
+    // MARK: - Legacy layout dimensions (delete with their owners)
+
     static let hostCardWidth:          CGFloat = 1180
     static let hostCardHeight:         CGFloat = 460
-    static let hostCardCorner:         CGFloat = 32
     static let hostCardConsoleWidth:   CGFloat = 380
     static let hostCardActionWidth:    CGFloat = 240
 
-    /// Settings vertical rail.
     static let settingsRailWidth:      CGFloat = 220
     static let settingsRowHeight:      CGFloat = 64
     static let settingsRailItemHeight: CGFloat = 80
 
-    /// Modal sheet (replaces the back-chevron-toolbar full-screen forms).
     static let modalMaxWidth:          CGFloat = 880
-    static let modalCorner:            CGFloat = 24
     static let modalContentPadding:    CGFloat = 40
 
-    /// Focus ring geometry.
     static let focusRingWidth:         CGFloat = 3
     static let focusRingBlur:          CGFloat = 24
 
-    // MARK: - Typography — current implementation
+    static let baseFontSize:           CGFloat = 20
+    static let dialogTitleFontSize:    CGFloat = 26
+    static let dialogHeaderFontSize:   CGFloat = 14
+    static let toolbarOkFontSize:      CGFloat = 25
+    static let errorTitleFontSize:     CGFloat = 24
+    static let errorTextFontSize:      CGFloat = 20
+    static let bigCloseFontSize:       CGFloat = 60
+    static let streamMenuCloseFontSize: CGFloat = 50
+    static let streamHudBitrateFontSize: CGFloat = 28
+    static let streamHudCounterFontSize: CGFloat = 18
+    static let streamHudLabelFontSize: CGFloat = 15
 
-    static let baseFontSize:                CGFloat = 20
-    static let dialogTitleFontSize:         CGFloat = 26
-    static let dialogHeaderFontSize:        CGFloat = 14
-    static let toolbarOkFontSize:           CGFloat = 25
-    static let errorTitleFontSize:          CGFloat = 24
-    static let errorTextFontSize:           CGFloat = 20
-    static let bigCloseFontSize:            CGFloat = 60     // "×" close button
-    static let streamMenuCloseFontSize:     CGFloat = 50
-    static let streamHudBitrateFontSize:    CGFloat = 28
-    static let streamHudCounterFontSize:    CGFloat = 18
-    static let streamHudLabelFontSize:      CGFloat = 15
+    static let hostTileHeight:         CGFloat = 180
+    static let hostTileLeftMargin:     CGFloat = 30
+    static let hostTileRightMargin:    CGFloat = 10
+    static let hostTileVerticalMargin: CGFloat = 10
+    static let hostTileSubitemSpacing: CGFloat = 50
+    static let consoleIconWidth:       CGFloat = 150
 
-    // MARK: - Typography — redesign ramp
+    // MARK: - Animation
     //
-    // Three roles, distinct sizes per HIG 10-foot legibility. The display
-    // role uses tight tracking; body keeps default tracking; mono is reserved
-    // for tabular numeric values (IP, MAC, bitrate, latency). At Step 1 we
-    // resolve to system fonts; the `Theme.font(...)` API below is the seam
-    // where Inter Display + Inter + JetBrains Mono swap in (Step 2) without
-    // touching call sites.
-
-    enum FontRole {
-        case displayXL    //  96pt — hero hero (e.g. "PS5-860" on the Host Card if we ever go larger)
-        case displayLarge //  72pt — host nickname on the Host Card
-        case displayMed   //  56pt — screen titles
-        case displaySmall //  44pt — section headers in modals
-        case titleLarge   //  36pt — settings tab titles
-        case titleMed     //  28pt — settings row label, button text
-        case bodyLarge    //  24pt — primary read-content
-        case bodyMed      //  22pt — settings row values
-        case bodySmall    //  18pt — secondary captions
-        case caption      //  14pt — meta labels (e.g. "ID:", "Address:")
-        case monoLarge    //  28pt — bitrate/latency display readouts
-        case monoMed      //  22pt — IP, MAC, version-like values
-        case monoSmall    //  16pt — chip text (READY / STANDBY)
-    }
-
-    /// Resolves a `FontRole` to a SwiftUI `Font`. System fonts today; will
-    /// switch to bundled Inter / JetBrains Mono in the type-asset commit.
-    static func font(_ role: FontRole) -> Font {
-        switch role {
-        case .displayXL:    return .system(size: 96, weight: .bold,    design: .default).leading(.tight)
-        case .displayLarge: return .system(size: 72, weight: .bold,    design: .default).leading(.tight)
-        case .displayMed:   return .system(size: 56, weight: .semibold, design: .default).leading(.tight)
-        case .displaySmall: return .system(size: 44, weight: .semibold, design: .default).leading(.tight)
-        case .titleLarge:   return .system(size: 36, weight: .semibold, design: .default)
-        case .titleMed:     return .system(size: 28, weight: .medium,  design: .default)
-        case .bodyLarge:    return .system(size: 24, weight: .regular, design: .default)
-        case .bodyMed:      return .system(size: 22, weight: .regular, design: .default)
-        case .bodySmall:    return .system(size: 18, weight: .regular, design: .default)
-        case .caption:      return .system(size: 14, weight: .medium,  design: .default).smallCaps()
-        case .monoLarge:    return .system(size: 28, weight: .medium,  design: .monospaced)
-        case .monoMed:      return .system(size: 22, weight: .regular, design: .monospaced)
-        case .monoSmall:    return .system(size: 16, weight: .medium,  design: .monospaced).smallCaps()
-        }
-    }
-
-    // MARK: - Animation (seconds)
+    // Semantic animation presets. tvOS focus state changes use the
+    // built-in `.smooth` / `.snappy` springs — these constants exist for
+    // explicit `withAnimation` calls only.
 
     static let stackTransitionDuration: Double = 0.20
     static let toastFadeDuration:       Double = 0.50
@@ -196,55 +206,45 @@ enum Theme {
     static let streamMenuSlide:         Double = 0.25
     static let logoPulseDuration:       Double = 1.00
 
-    /// Focus enter/exit spring — the canonical motion for any focusable
-    /// surface that scales/translates on focus.
-    static let focusSpring: Animation = .interpolatingSpring(
-        mass: 0.7, stiffness: 280, damping: 18, initialVelocity: 0
-    )
+    /// Default focus-state spring. Use `.smooth(duration: 0.28)` for
+    /// new code; the alias is retained for in-flight components.
+    static let focusSpring: Animation = .smooth(duration: 0.28)
 
-    /// Card route transition — the host card scales up to 1.20× while the
-    /// destination view crossfades over it. 320ms total.
     static let routeTransitionDuration: Double = 0.32
 
     // MARK: - Radii
 
     static let smallRadius:  CGFloat = 4
     static let mediumRadius: CGFloat = 8
-    /// New: rounded-rect for elevated cards (settings rows, segment cells).
     static let cardRadius:   CGFloat = 16
+    static let modalCorner:  CGFloat = 24
+    static let hostCardCorner: CGFloat = 28
 }
 
-// MARK: - Background
+// MARK: - View modifiers
 
 extension View {
-    /// Atmospheric ink-base background with a soft cool/warm radial mesh.
-    /// One off-canvas blue anchor (top-left), one off-canvas amber anchor
-    /// (bottom-right), creating a quiet diagonal pull from the home screen's
-    /// header toward the Host Card's primary action. Static — no per-frame
-    /// cost. See docs/ui/redesign-plan.md §3 "Background".
+    /// Apply ChiakiTV's atmospheric background — a deep ink base with soft
+    /// off-canvas radial accents. Static; no per-frame cost.
     func chiakiBackground() -> some View {
         self.background(
             ZStack {
-                // Base ink fill.
                 Theme.ink900
 
-                // Cool blue anchor, top-left, off-canvas. Soft and wide.
                 RadialGradient(
-                    colors: [Theme.psBlue.opacity(0.18), Color.clear],
+                    colors: [Theme.psBlue.opacity(0.22), Color.clear],
                     center: UnitPoint(x: -0.05, y: -0.10),
                     startRadius: 60,
                     endRadius: 1400
                 )
 
-                // Warm amber anchor, bottom-right, off-canvas. Even softer.
                 RadialGradient(
-                    colors: [Theme.amber500.opacity(0.10), Color.clear],
+                    colors: [Theme.amber500.opacity(0.14), Color.clear],
                     center: UnitPoint(x: 1.10, y: 1.15),
                     startRadius: 80,
                     endRadius: 1500
                 )
 
-                // Subtle vignette to keep the corners reading as "deep".
                 RadialGradient(
                     colors: [Color.clear, Theme.ink900.opacity(0.6)],
                     center: .center,
@@ -255,20 +255,62 @@ extension View {
             .ignoresSafeArea()
         )
     }
+
+    /// Apply the app's tint at the root. Sets `.accentColor(.amber500)` so
+    /// every descendant `Toggle`, `Picker`, `Slider`, and
+    /// `.buttonStyle(.card)` inherits the brand color without per-call-site
+    /// `.tint(...)`.
+    func applyChiakiTheme() -> some View {
+        self
+            .tint(Theme.amber500)
+            .preferredColorScheme(.dark)
+    }
 }
 
-// MARK: - Focus ring helper
+// MARK: - Custom button styles
 
+/// Primary brand button — amber gradient fill, ink-on-amber type, system-
+/// native focus chrome via `.focusable()` semantics. Use for the single
+/// primary action on a screen (CONNECT on Host Card; primary toolbar
+/// button on a sheet). For everything else, `.buttonStyle(.card)` is the
+/// canonical tvOS focus chrome.
+struct ChiakiPrimaryButtonStyle: ButtonStyle {
+    @Environment(\.isFocused) private var isFocused
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(Theme.font(.bodyEmph).weight(.bold))
+            .foregroundStyle(Theme.ink900)
+            .padding(.horizontal, 32)
+            .padding(.vertical, 18)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(LinearGradient(
+                        colors: [Theme.amber400, Theme.amber500],
+                        startPoint: .topLeading,
+                        endPoint:   .bottomTrailing
+                    ))
+            )
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .animation(.smooth(duration: 0.18), value: configuration.isPressed)
+    }
+}
+
+extension ButtonStyle where Self == ChiakiPrimaryButtonStyle {
+    /// `.buttonStyle(.chiakiPrimary)` — the brand amber primary CTA.
+    static var chiakiPrimary: ChiakiPrimaryButtonStyle { ChiakiPrimaryButtonStyle() }
+}
+
+// MARK: - Deprecated helpers (slated for removal)
+
+@available(*, deprecated, message: "Use .buttonStyle(.card) for tvOS focus chrome instead.")
 extension View {
-    /// Apply the canonical amber focus ring to any rounded-rect surface.
-    /// Caller decides the corner radius and supplies the `isFocused` flag.
+    /// Legacy focus ring helper. Kept only so existing call sites compile
+    /// during the migration; will be removed in the final cleanup commit.
     func chiakiFocusRing(_ isFocused: Bool, cornerRadius: CGFloat) -> some View {
         self.overlay(
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .stroke(isFocused ? Theme.amber500 : Color.clear,
-                        lineWidth: Theme.focusRingWidth)
+                .stroke(isFocused ? Theme.amber500 : Color.clear, lineWidth: 3)
         )
-        .shadow(color: isFocused ? Theme.amberGlow : .clear,
-                radius: Theme.focusRingBlur, x: 0, y: 0)
     }
 }
