@@ -28,6 +28,7 @@ struct HostListView: View {
             bottomBar
         }
         .chiakiBackground()
+        .ignoresSafeArea()
     }
 
     // MARK: - Top toolbar
@@ -70,7 +71,8 @@ struct HostListView: View {
             .accessibilityLabel("Settings")
         }
         .padding(.horizontal, Theme.space7)
-        .frame(height: Theme.toolbarHeight)
+        .padding(.top, Theme.space5)
+        .frame(height: Theme.toolbarHeight + Theme.space5)
         .focusSection()
     }
 
