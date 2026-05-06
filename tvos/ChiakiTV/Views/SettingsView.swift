@@ -355,8 +355,6 @@ private struct ConsolesTab: View {
                 }
             } header: {
                 Text("Registered consoles")
-            } footer: {
-                Text("A registered PS5 can be reached without entering its PIN every time.")
             }
 
             Section {
