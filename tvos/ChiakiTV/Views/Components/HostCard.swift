@@ -65,7 +65,11 @@ struct HostCard: View {
         .modifier(PulseShadow(active: host.state == .ready && !reduceMotion,
                               cardFocused: cardFocused,
                               rimColor: rimColor))
-        .focusSection()
+        // No `.focusSection()` here. The card's focusable children
+        // (Connect / Hide / Wake / Re-pair) are addressed individually so
+        // pressing Up from Connect can escape spatially to the toolbar
+        // above, instead of being trapped in a section that has no
+        // focusable above the action row.
         .defaultFocus($focused, .connect)
         .animation(.smooth(duration: 0.28), value: cardFocused)
     }
@@ -236,10 +240,10 @@ struct HostCard: View {
 }
 
 /// Pulse-shadow modifier — drives the breathing rim glow on ready hosts.
-/// Subtle on purpose: the system's `.buttonStyle(.borderedProminent)` focus
-/// chrome already provides a halo around Connect, so the card-level shadow
-/// stays at low opacity to keep the buttons distinguishable from their
-/// surrounding glow.
+/// Higher amplitude than v3.1 so the card visibly *breathes* — the user
+/// preferred this over the toned-down version. The button focus halos
+/// inside the card are system-rendered and don't interact with this
+/// shadow (it's drawn outside the card's frame).
 private struct PulseShadow: ViewModifier {
     let active: Bool
     let cardFocused: Bool
@@ -250,20 +254,18 @@ private struct PulseShadow: ViewModifier {
             PhaseAnimator([HostCard_PulsePhase.dim, .bright]) { phase in
                 content
                     .shadow(color: rimColor.opacity(opacity(for: phase)),
-                            radius: 24, x: 0, y: 0)
+                            radius: cardFocused ? 40 : 28, x: 0, y: 0)
             } animation: { _ in .smooth(duration: 1.4) }
         } else {
             content
-                .shadow(color: rimColor.opacity(cardFocused ? 0.16 : 0.08),
-                        radius: 20, x: 0, y: 0)
+                .shadow(color: rimColor.opacity(cardFocused ? 0.45 : 0.18),
+                        radius: cardFocused ? 40 : 22, x: 0, y: 0)
         }
     }
 
     private func opacity(for phase: HostCard_PulsePhase) -> Double {
-        // ready-state breathing glow — 0.06–0.14, not the previous 0.14–0.55.
-        // Keep it visible without competing with the button focus halos.
-        if cardFocused { return phase == .bright ? 0.14 : 0.08 }
-        return phase == .bright ? 0.12 : 0.06
+        if cardFocused { return phase == .bright ? 0.55 : 0.40 }
+        return phase == .bright ? 0.28 : 0.14
     }
 }
 

@@ -38,8 +38,8 @@ struct HostListView: View {
     // actions (Add Manual Host, Settings) live on the right.
 
     private var topToolbar: some View {
-        HStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: Theme.space5) {
+            VStack(alignment: .leading, spacing: Theme.space1) {
                 Text("ChiakiTV")
                     .font(Theme.font(.titleLarge).weight(.semibold))
                     .foregroundStyle(Theme.white50)
@@ -47,7 +47,6 @@ struct HostListView: View {
 
                 discoveryStatusLine
             }
-            .padding(.leading, 60)
 
             Spacer()
 
@@ -59,7 +58,6 @@ struct HostListView: View {
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .padding(.trailing, 12)
 
             Button {
                 appState.showSettings()
@@ -70,9 +68,10 @@ struct HostListView: View {
             }
             .buttonStyle(.borderless)
             .accessibilityLabel("Settings")
-            .padding(.trailing, 40)
         }
+        .padding(.horizontal, Theme.space8)
         .frame(height: Theme.toolbarHeight)
+        .focusSection()
     }
 
     /// Tiny inline indicator next to the wordmark — replaces the bottom-bar
@@ -99,7 +98,7 @@ struct HostListView: View {
             emptyState
         } else {
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: Theme.space5) {
                     ForEach(appState.hosts) { host in
                         HostCard(
                             host: host,
@@ -111,14 +110,14 @@ struct HostListView: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 40)
+                .padding(.horizontal, Theme.space8)
+                .padding(.top, Theme.space7)
+                .padding(.bottom, Theme.space5)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             // Note: previously wrapped in `.focusSection()` to corral focus
-            // away from a now-removed bottom-bar wifi pill. With that pill
-            // gone, the section was trapping focus inside the card —
-            // pressing Up from Connect couldn't escape to the toolbar.
-            // Removed.
+            // away from a now-removed bottom-bar wifi pill. Removing that
+            // section unblocked Up-from-Connect → toolbar navigation.
         }
     }
 
