@@ -314,17 +314,20 @@ private struct ConsolesTab: View {
                 if appState.registeredHosts.isEmpty {
                     // Empty-state row inside the same Form chrome as the
                     // populated state — keeps the visual rhythm matching
-                    // every other Settings tab (Form { Section { ... } }
-                    // with header + rows).
-                    VStack(alignment: .leading, spacing: Theme.space2) {
+                    // every other Settings tab. Centered alignment +
+                    // generous padding distinguishes it as a "callout"
+                    // rather than a clickable row.
+                    VStack(spacing: Theme.space3) {
                         Text("No registered consoles")
                             .font(.system(.body).weight(.semibold))
                         Text("Pair a PS5 to use Remote Play without re-entering a PIN every time.")
                             .font(.system(.footnote))
                             .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, Theme.space2)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, Theme.space6)
+                    .padding(.horizontal, Theme.space6)
                     .listRowBackground(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .fill(Color.white.opacity(0.05))
