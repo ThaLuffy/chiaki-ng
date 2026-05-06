@@ -309,20 +309,36 @@ private struct ConsolesTab: View {
     @Environment(AppState.self) private var appState
 
     var body: some View {
-        Form {
-            if appState.registeredHosts.isEmpty {
-                Section {
-                    ContentUnavailableView(
-                        "No registered consoles",
-                        systemImage: "gamecontroller",
-                        description: Text("Pair a PS5 to use Remote Play without re-entering a PIN every time.")
-                    )
+        if appState.registeredHosts.isEmpty {
+            // SwiftUI's canonical empty-state pattern: ContentUnavailableView
+            // with an `actions:` block. When the list is empty, we drop the
+            // Form chrome entirely so the empty state can center properly
+            // (Form rows force leading text alignment and break the
+            // ContentUnavailableView's centered layout).
+            ContentUnavailableView {
+                Label("No registered consoles", systemImage: "gamecontroller")
+            } description: {
+                Text("Pair a PS5 to use Remote Play without re-entering a PIN every time.")
+            } actions: {
+                Button {
+                    appState.showRegistration(for: Host(
+                        id: UUID().uuidString,
+                        nickname: "New PS5",
+                        ipAddress: ""
+                    ))
+                } label: {
+                    Label("Register a new console", systemImage: "plus.circle.fill")
                 }
-            } else {
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            Form {
                 Section {
                     ForEach(appState.registeredHosts) { host in
-                        LabeledContent(host.nickname) {
-                            HStack(spacing: 16) {
+                        SettingsRow(host.nickname, valueInset: 2) {
+                            HStack(spacing: Theme.space5) {
                                 Text(host.mac)
                                     .font(Theme.font(.mono))
                                     .foregroundStyle(.secondary)
@@ -334,31 +350,34 @@ private struct ConsolesTab: View {
                                     Label("Forget", systemImage: "trash")
                                         .labelStyle(.iconOnly)
                                 }
-                                .buttonStyle(.card)
+                                .buttonStyle(.bordered)
+                                .tint(.secondary)
                             }
                         }
                     }
                 } header: {
                     Text("Registered consoles")
                 }
-            }
 
-            Section {
-                Button {
-                    appState.showRegistration(for: Host(
-                        id: UUID().uuidString,
-                        nickname: "New PS5",
-                        ipAddress: ""
-                    ))
-                } label: {
-                    Label("Register a new console", systemImage: "plus.circle.fill")
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                Section {
+                    Button {
+                        appState.showRegistration(for: Host(
+                            id: UUID().uuidString,
+                            nickname: "New PS5",
+                            ipAddress: ""
+                        ))
+                    } label: {
+                        Label("Register a new console",
+                              systemImage: "plus.circle.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .listRowBackground(Color.clear)
                 }
-                .buttonStyle(.card)
             }
+            .formStyle(.grouped)
         }
-        .formStyle(.grouped)
-
     }
 }
 
