@@ -3,16 +3,27 @@
 import SwiftUI
 import GameController
 
-/// Settings screen — slimmed projection of
-/// [`gui/src/qml/SettingsDialog.qml`](../../../gui/src/qml/SettingsDialog.qml).
+/// Settings screen with a vertical rail navigator per
+/// [`docs/ui/redesign-plan.md §4.2 + §5.2`](../../docs/ui/redesign-plan.md).
 ///
-/// Four tabs (down from the desktop's nine — see [`docs/ui/swift-ui-plan.md`](../../docs/ui/swift-ui-plan.md) §1):
-///   1. **General** — disconnect/suspend behavior + PSN Account-ID prefill.
-///   2. **Video & Stream** — resolution, FPS, bitrate, codec, render preset.
-///   3. **Audio** — buffer + volume + WiFi notification thresholds.
-///   4. **Consoles** — registered hosts list + "Register New Console" CTA.
+/// Five tabs (re-named + re-ordered from the original General / Video /
+/// Audio / Consoles / Controller — content unchanged in this step; row
+/// rework lives in §4.4 / Step 4):
+///
+/// 1. **Stream** — resolution, FPS, bitrate, codec, render preset.
+///    *Was "Video & Stream".*
+/// 2. **Network** — buffer, volume, weak-wifi + packet-loss thresholds.
+///    *Was "Audio". Renamed because half the rows are network diagnostics.*
+/// 3. **Controller** — DualSense / MFi diagnostic surface.
+/// 4. **Consoles** — registered host list + "Register New Console" CTA.
+/// 5. **App** — disconnect/suspend behavior, streamer mode, verbose logs,
+///    PSN account ID. *Was "General". Renamed; "General" is meaningless.*
+///
+/// The rail anchors left at 220pt; tab content fills the remaining 1700pt
+/// (resolves audit issue S1 — the centered narrow form).
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
+    @State private var selectedTab: SettingsTab = .stream
 
     var body: some View {
         ChiakiDialogChrome(
@@ -20,27 +31,132 @@ struct SettingsView: View {
             subtitle: "* Defaults marked with (Default)",
             onBack: { appState.showHostList() }
         ) {
-            // No primary action button on the Settings screen — desktop's
-            // SettingsDialog has `buttonVisible: false`.
             EmptyView()
         } content: {
-            TabView {
-                GeneralTab()
-                    .tabItem { Label("General", systemImage: "slider.horizontal.3") }
-
-                VideoStreamTab()
-                    .tabItem { Label("Video & Stream", systemImage: "tv") }
-
-                AudioTab()
-                    .tabItem { Label("Audio", systemImage: "speaker.wave.2.fill") }
-
-                ConsolesTab()
-                    .tabItem { Label("Consoles", systemImage: "gamecontroller.fill") }
-
-                ControllerDiagnosticTab()
-                    .tabItem { Label("Controller", systemImage: "dot.radiowaves.left.and.right") }
+            HStack(spacing: 0) {
+                rail
+                contentArea
             }
         }
+    }
+
+    // MARK: - Vertical rail
+
+    private var rail: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(SettingsTab.allCases) { tab in
+                SettingsRailButton(tab: tab,
+                                   isSelected: selectedTab == tab) {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        selectedTab = tab
+                    }
+                }
+            }
+            Spacer()
+        }
+        .frame(width: Theme.settingsRailWidth, alignment: .topLeading)
+        .padding(.top, 32)
+        .padding(.horizontal, 12)
+        .focusSection()
+    }
+
+    // MARK: - Content area
+
+    @ViewBuilder
+    private var contentArea: some View {
+        Group {
+            switch selectedTab {
+            case .stream:     VideoStreamTab()
+            case .network:    AudioTab()
+            case .controller: ControllerDiagnosticTab()
+            case .consoles:   ConsolesTab()
+            case .app:        GeneralTab()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(.top, 24)
+        .padding(.horizontal, 24)
+        .focusSection()
+    }
+}
+
+// MARK: - Tab descriptor
+
+enum SettingsTab: String, CaseIterable, Identifiable {
+    case stream, network, controller, consoles, app
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .stream:     return "Stream"
+        case .network:    return "Network"
+        case .controller: return "Controller"
+        case .consoles:   return "Consoles"
+        case .app:        return "App"
+        }
+    }
+
+    /// SF Symbol for the rail icon — kept in the same family as the
+    /// previous TabView icons so muscle memory carries over.
+    var icon: String {
+        switch self {
+        case .stream:     return "tv"
+        case .network:    return "antenna.radiowaves.left.and.right"
+        case .controller: return "gamecontroller"
+        case .consoles:   return "list.bullet.rectangle.portrait"
+        case .app:        return "slider.horizontal.3"
+        }
+    }
+}
+
+// MARK: - Rail button
+
+private struct SettingsRailButton: View {
+    let tab: SettingsTab
+    let isSelected: Bool
+    let action: () -> Void
+
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                // Active-state amber bar on the left edge.
+                Rectangle()
+                    .fill(isSelected ? Theme.amber500 : Color.clear)
+                    .frame(width: 4)
+
+                Image(systemName: tab.icon)
+                    .font(.system(size: 22, weight: .medium))
+                    .frame(width: 28)
+
+                Text(tab.label)
+                    .font(Theme.font(.titleMed))
+
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(textColor)
+            .frame(height: Theme.settingsRailItemHeight)
+            .padding(.trailing, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(isFocused ? Theme.ink700
+                                    : (isSelected ? Theme.ink800.opacity(0.6)
+                                                  : Color.clear))
+            )
+            .scaleEffect(isFocused ? 1.03 : 1.0)
+        }
+        .buttonStyle(.plain)
+        .focused($isFocused)
+        .chiakiFocusRing(isFocused, cornerRadius: 12)
+        .animation(Theme.focusSpring, value: isFocused)
+    }
+
+    private var textColor: Color {
+        if isFocused { return Theme.white50 }
+        if isSelected { return Theme.amber500 }
+        return Theme.mist500
     }
 }
 
