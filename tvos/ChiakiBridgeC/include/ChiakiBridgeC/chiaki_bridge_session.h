@@ -175,6 +175,12 @@ typedef struct {
     bool auto_regist;
     double packet_loss_max;
     bool enable_idr_on_fec_failure;
+    /* Takion reorder-queue size exponent override (window = 1 << exp).
+     * 0 = use chiaki's built-in default (4 → 16 entries). On wired LAN,
+     * 2 (4 entries) reduces delivery delay on the rare reorder. See
+     * `lib/include/chiaki/session.h` `takion_reorder_queue_size_exp` and
+     * `docs/optimization/native-alternatives-latency-first.md` Phase B.3. */
+    uint32_t takion_reorder_queue_size_exp;
 
     /* Callbacks. */
     chiaki_tv_session_event_cb_t event_cb;

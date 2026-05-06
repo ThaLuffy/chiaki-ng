@@ -193,6 +193,13 @@ final class StreamSession {
                         config.auto_regist = false
                         config.packet_loss_max = 0.05
                         config.enable_idr_on_fec_failure = true
+                        // Wired-LAN tuning: shrink takion's reorder window
+                        // from default 16 entries (exp=4) to 4 entries
+                        // (exp=2). Reordering on a wired LAN is rare; a
+                        // smaller window means delivery delay on the rare
+                        // reorder is bounded tighter.
+                        // See docs/optimization/native-alternatives-latency-first.md Phase B.3.
+                        config.takion_reorder_queue_size_exp = 2
 
                         config.event_cb = Self.cEventCallback
                         config.event_cb_user = retained.toOpaque()

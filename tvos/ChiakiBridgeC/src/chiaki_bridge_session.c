@@ -203,6 +203,7 @@ chiaki_tv_session_t *chiaki_tv_session_create(
     memcpy(ci.psn_account_id, config->psn_account_id, sizeof(ci.psn_account_id));
     ci.packet_loss_max       = config->packet_loss_max;
     ci.enable_idr_on_fec_failure = config->enable_idr_on_fec_failure;
+    ci.takion_reorder_queue_size_exp = config->takion_reorder_queue_size_exp;
 
     ChiakiLog *log = (ChiakiLog *)chiaki_tv_log_get();
     ChiakiErrorCode err = chiaki_session_init(&self->session, &ci, log);
