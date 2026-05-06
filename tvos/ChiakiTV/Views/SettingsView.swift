@@ -154,10 +154,7 @@ private struct StreamTab: View {
             }
 
             Section {
-                SettingsRow("Vertical sync") {
-                    Toggle("", isOn: $appState.settings.verticalSync)
-                        .labelsHidden()
-                }
+                Toggle("Vertical sync", isOn: $appState.settings.verticalSync)
             } footer: {
                 Text("Reduces tearing. Adds ~16 ms of latency.")
             }
@@ -276,15 +273,9 @@ private struct AppTab: View {
             }
 
             Section {
-                SettingsRow("Streamer Mode") {
-                    Toggle("", isOn: $appState.settings.streamerMode).labelsHidden()
-                }
-                SettingsRow("Verbose Logs") {
-                    Toggle("", isOn: $appState.settings.verboseLogs).labelsHidden()
-                }
-                SettingsRow("Show Stream Stats") {
-                    Toggle("", isOn: $appState.settings.showStreamStats).labelsHidden()
-                }
+                Toggle("Streamer Mode", isOn: $appState.settings.streamerMode)
+                Toggle("Verbose Logs", isOn: $appState.settings.verboseLogs)
+                Toggle("Show Stream Stats", isOn: $appState.settings.showStreamStats)
             } header: {
                 Text("Diagnostics")
             } footer: {
