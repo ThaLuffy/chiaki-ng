@@ -117,6 +117,9 @@ typedef struct chiaki_takion_connect_info_t
 	bool enable_dualsense;
 	uint8_t protocol_version;
 	bool close_socket; // close socket when finishing takion
+	/* Reorder-queue size exponent override (window = 1 << exp). 0 = use the
+	 * built-in default (`TAKION_REORDER_QUEUE_SIZE_EXP`). */
+	unsigned int reorder_queue_size_exp;
 } ChiakiTakionConnectInfo;
 
 
@@ -181,6 +184,11 @@ typedef struct chiaki_takion_t
 	ChiakiKeyState key_state;
 
 	bool enable_dualsense;
+
+	/* Resolved reorder-queue exponent: 0 means use the built-in default
+	 * (TAKION_REORDER_QUEUE_SIZE_EXP). Captured from
+	 * ChiakiTakionConnectInfo at chiaki_takion_connect time. */
+	unsigned int reorder_queue_size_exp;
 } ChiakiTakion;
 
 

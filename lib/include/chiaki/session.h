@@ -89,6 +89,13 @@ typedef struct chiaki_connect_info_t
 	uint8_t psn_account_id[CHIAKI_PSN_ACCOUNT_ID_SIZE];
 	double packet_loss_max;
 	bool enable_idr_on_fec_failure;
+	/* Reorder-queue size exponent (window = 1 << exp) used by Takion for
+	 * out-of-order packet handling. The historical default of 4
+	 * (`TAKION_REORDER_QUEUE_SIZE_EXP`, 16 entries) is suited to Wi-Fi;
+	 * on wired LAN where reordering is rare this can drop to 2 (4 entries)
+	 * to reduce delivery delay on the rare reorder. Set to 0 to use the
+	 * historical default. */
+	unsigned int takion_reorder_queue_size_exp;
 } ChiakiConnectInfo;
 
 
@@ -227,6 +234,7 @@ typedef struct chiaki_session_t
 		bool enable_dualsense;
 		uint8_t psn_account_id[CHIAKI_PSN_ACCOUNT_ID_SIZE];
 		bool enable_idr_on_fec_failure;
+		unsigned int takion_reorder_queue_size_exp;  /* 0 = use built-in default (4) */
 	} connect_info;
 
 	ChiakiTarget target;

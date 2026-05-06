@@ -248,6 +248,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_connect(ChiakiTakion *takion, Chiaki
 	takion->postponed_packets_size = 0;
 	takion->postponed_packets_count = 0;
 	takion->enable_dualsense = info->enable_dualsense;
+	takion->reorder_queue_size_exp = info->reorder_queue_size_exp;
 
 	CHIAKI_LOGI(takion->log, "Takion connecting (version %u)", (unsigned int)info->protocol_version);
 	bool mac_dontfrag = true;
@@ -1092,8 +1093,13 @@ static void *takion_thread_func(void *user)
 	if(takion_handshake(takion, &seq_num_remote_initial) != CHIAKI_ERR_SUCCESS)
 		goto beach;
 
-	if(chiaki_reorder_queue_init_32(&takion->data_queue, TAKION_REORDER_QUEUE_SIZE_EXP, seq_num_remote_initial) != CHIAKI_ERR_SUCCESS)
-		goto beach;
+	{
+		unsigned int reorder_exp = takion->reorder_queue_size_exp;
+		if(reorder_exp == 0)
+			reorder_exp = TAKION_REORDER_QUEUE_SIZE_EXP;
+		if(chiaki_reorder_queue_init_32(&takion->data_queue, reorder_exp, seq_num_remote_initial) != CHIAKI_ERR_SUCCESS)
+			goto beach;
+	}
 
 	chiaki_reorder_queue_set_drop_cb(&takion->data_queue, takion_data_drop, takion);
 
