@@ -114,13 +114,11 @@ struct HostListView: View {
                 .padding(.vertical, 40)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            // Make the hero zone a focus region. Without this, D-pad Down
-            // from the toolbar's left-edge buttons (X, gear) jumps directly
-            // to the bottom-bar's left-edge wifi pill — the focus engine's
-            // spatial-alignment rule prefers vertical X-alignment over
-            // proximity. With `focusSection()`, the engine has to enter
-            // this zone first, landing on the Connect button.
-            .focusSection()
+            // Note: previously wrapped in `.focusSection()` to corral focus
+            // away from a now-removed bottom-bar wifi pill. With that pill
+            // gone, the section was trapping focus inside the card —
+            // pressing Up from Connect couldn't escape to the toolbar.
+            // Removed.
         }
     }
 

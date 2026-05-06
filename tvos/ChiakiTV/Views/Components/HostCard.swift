@@ -236,7 +236,10 @@ struct HostCard: View {
 }
 
 /// Pulse-shadow modifier — drives the breathing rim glow on ready hosts.
-/// Extracted from `HostCard.body` so the body stays scannable.
+/// Subtle on purpose: the system's `.buttonStyle(.borderedProminent)` focus
+/// chrome already provides a halo around Connect, so the card-level shadow
+/// stays at low opacity to keep the buttons distinguishable from their
+/// surrounding glow.
 private struct PulseShadow: ViewModifier {
     let active: Bool
     let cardFocused: Bool
@@ -247,18 +250,20 @@ private struct PulseShadow: ViewModifier {
             PhaseAnimator([HostCard_PulsePhase.dim, .bright]) { phase in
                 content
                     .shadow(color: rimColor.opacity(opacity(for: phase)),
-                            radius: cardFocused ? 40 : 28, x: 0, y: 0)
+                            radius: 24, x: 0, y: 0)
             } animation: { _ in .smooth(duration: 1.4) }
         } else {
             content
-                .shadow(color: rimColor.opacity(cardFocused ? 0.45 : 0.18),
-                        radius: cardFocused ? 40 : 22, x: 0, y: 0)
+                .shadow(color: rimColor.opacity(cardFocused ? 0.16 : 0.08),
+                        radius: 20, x: 0, y: 0)
         }
     }
 
     private func opacity(for phase: HostCard_PulsePhase) -> Double {
-        if cardFocused { return phase == .bright ? 0.55 : 0.40 }
-        return phase == .bright ? 0.28 : 0.14
+        // ready-state breathing glow — 0.06–0.14, not the previous 0.14–0.55.
+        // Keep it visible without competing with the button focus halos.
+        if cardFocused { return phase == .bright ? 0.14 : 0.08 }
+        return phase == .bright ? 0.12 : 0.06
     }
 }
 
