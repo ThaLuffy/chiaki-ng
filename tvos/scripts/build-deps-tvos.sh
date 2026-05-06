@@ -132,7 +132,7 @@ build_openssl() {
         "$sha256"
 
     for slice in "${SLICES[@]}"; do
-        if already_built "$slice" "lib/libcrypto.a.openssl-$version"; then
+        if already_built "$slice" "lib/libcrypto.a.openssl-$version-asm"; then
             say "openssl/$slice: already built"
             continue
         fi
@@ -151,13 +151,18 @@ build_openssl() {
             # (set in slice_env) to convey the target triple and sysroot,
             # and pass only the `darwin64-arm64-cc` preset name here.
             #
-            # `no-asm` because OpenSSL's arm64 asm calls into routines
-            # that aren't valid on tvOS. The C fallback is fine for the
-            # crypto we use (AES + ECDH + HMAC).
+            # ARMv8 asm enabled (no `no-asm`): the `darwin64-arm64-cc` preset
+            # generates AArch64 crypto-extension paths (`AESE`/`AESD`/`PMULL`)
+            # which is the single biggest streaming-hot-path optimization on
+            # A15 — `gkcrypt.c` runs AES-128-ECB + AES-128-GCM on every UDP
+            # packet via `EVP_*`. See:
+            #   docs/optimization/native-alternatives-latency-first.md Phase A.1
+            # If a future tvOS SDK strips a symbol the asm needs, restore
+            # `no-asm` and switch to a shim instead.
             ./Configure darwin64-arm64-cc \
                 --prefix="$PREFIX_DIR/$slice" \
                 --openssldir="$PREFIX_DIR/$slice/ssl" \
-                no-shared no-asm no-tests no-engine no-dso no-async \
+                no-shared no-tests no-engine no-dso no-async \
                 no-ui-console no-stdio
 
             say "openssl/$slice: building libcrypto only"
@@ -166,8 +171,10 @@ build_openssl() {
             make install_dev >/dev/null
         )
 
-        # Stamp so we can skip on subsequent runs.
-        touch "$PREFIX_DIR/$slice/lib/libcrypto.a.openssl-$version"
+        # Stamp so we can skip on subsequent runs. Suffix changes whenever
+        # the build options change (e.g. `no-asm` → asm).
+        rm -f "$PREFIX_DIR/$slice/lib/libcrypto.a.openssl-$version"
+        touch "$PREFIX_DIR/$slice/lib/libcrypto.a.openssl-$version-asm"
         say "openssl/$slice: done → $PREFIX_DIR/$slice/lib/libcrypto.a"
     done
 }
