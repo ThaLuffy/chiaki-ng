@@ -387,6 +387,16 @@ private struct ControllerDiagnosticTab: View {
     @State private var snapshot = ControllerSnapshot()
     @State private var pollTask: Task<Void, Never>? = nil
     @State private var diagnosticActive = false
+    /// Per-button "first observed pressed at" timestamp. Cleared when
+    /// the button is released. Drives the hold-2s exit.
+    @State private var pressStarts: [String: Date] = [:]
+    /// Latest hold duration for any currently-pressed button — used to
+    /// drive a small progress indicator showing how close the user is
+    /// to triggering the exit. Updated each poll tick.
+    @State private var maxHoldDuration: TimeInterval = 0
+
+    /// How long to hold any button before exiting diagnostic mode.
+    private let exitHoldThreshold: TimeInterval = 2.0
 
     var body: some View {
         Group {
@@ -468,6 +478,7 @@ private struct ControllerDiagnosticTab: View {
             GridItem(.flexible(), spacing: Theme.space5),
             GridItem(.flexible(), spacing: Theme.space5)
         ]
+        let exitProgress = min(1.0, maxHoldDuration / exitHoldThreshold)
 
         return VStack(spacing: Theme.space6) {
             diagnosticHeader(for: c)
@@ -499,14 +510,35 @@ private struct ControllerDiagnosticTab: View {
 
             Spacer(minLength: 0)
 
-            Text("Press Menu / B to exit diagnostic")
-                .font(.system(.footnote))
-                .foregroundStyle(.secondary)
-                .padding(.bottom, Theme.space5)
+            exitHint(progress: exitProgress)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.top, Theme.space6)
-        .onExitCommand { diagnosticActive = false }
+        // No .onExitCommand — it would let the Menu / B button on a
+        // controller exit instantly, defeating the purpose of being able
+        // to diagnose those exact buttons. Exit is hold-any-button-2s
+        // (see startPolling()).
+    }
+
+    /// Footer with the exit instruction + a thin progress bar that
+    /// fills as the user holds a button toward the 2-second threshold.
+    @ViewBuilder
+    private func exitHint(progress: Double) -> some View {
+        VStack(spacing: Theme.space2) {
+            Text(progress > 0
+                 ? "Keep holding to exit…"
+                 : "Hold any button for 2 seconds to exit diagnostic")
+                .font(.system(.footnote))
+                .foregroundStyle(.secondary)
+
+            ProgressView(value: progress, total: 1.0)
+                .progressViewStyle(.linear)
+                .tint(progress >= 1.0 ? Theme.green500 : Theme.amber500)
+                .frame(width: 320)
+                .opacity(progress > 0 ? 1.0 : 0.0)
+        }
+        .padding(.bottom, Theme.space5)
+        .animation(.easeOut(duration: 0.12), value: progress)
     }
 
     private func diagnosticHeader(for c: ControllerSnapshot.Entry) -> some View {
@@ -524,7 +556,16 @@ private struct ControllerDiagnosticTab: View {
         pollTask?.cancel()
         pollTask = Task { @MainActor in
             while !Task.isCancelled {
-                snapshot = ControllerSnapshot.capture()
+                let newSnap = ControllerSnapshot.capture()
+                snapshot = newSnap
+
+                if diagnosticActive {
+                    updateHoldExit(snapshot: newSnap)
+                } else if !pressStarts.isEmpty || maxHoldDuration > 0 {
+                    pressStarts.removeAll()
+                    maxHoldDuration = 0
+                }
+
                 try? await Task.sleep(for: .milliseconds(80))
             }
         }
@@ -533,6 +574,42 @@ private struct ControllerDiagnosticTab: View {
     private func stopPolling() {
         pollTask?.cancel()
         pollTask = nil
+    }
+
+    /// Track per-button hold duration; fire the exit when any button has
+    /// been held continuously for `exitHoldThreshold`.
+    @MainActor
+    private func updateHoldExit(snapshot: ControllerSnapshot) {
+        let now = Date()
+        var longest: TimeInterval = 0
+        var shouldExit = false
+
+        for c in snapshot.controllers {
+            for btn in c.buttons {
+                if btn.pressed {
+                    if pressStarts[btn.name] == nil {
+                        pressStarts[btn.name] = now
+                    }
+                    if let start = pressStarts[btn.name] {
+                        let held = now.timeIntervalSince(start)
+                        longest = max(longest, held)
+                        if held >= exitHoldThreshold {
+                            shouldExit = true
+                        }
+                    }
+                } else {
+                    pressStarts.removeValue(forKey: btn.name)
+                }
+            }
+        }
+
+        maxHoldDuration = longest
+
+        if shouldExit {
+            diagnosticActive = false
+            pressStarts.removeAll()
+            maxHoldDuration = 0
+        }
     }
 }
 
