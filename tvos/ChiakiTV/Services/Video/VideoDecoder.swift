@@ -214,6 +214,13 @@ final class VideoDecoder: @unchecked Sendable {
                 throw VideoDecoderError.invalidParameterSets
             }
             let sets: [Data] = [vps, sps, pps]
+            // For HDR10 we tag the format description with BT.2020 / SMPTE
+            // 2084 (PQ) / BT.2020-NCL so VideoToolbox decodes into a properly
+            // colorspace-tagged CVPixelBuffer and AVDisplayManager can match
+            // an AVDisplayCriteria from this same description.
+            let extensions: CFDictionary? = (codec == .h265HDR)
+                ? Self.hdr10ExtensionsDictionary()
+                : nil
             status = sets.withContiguousUnsafeBuffers { buffers in
                 let pointers = buffers.map { $0.baseAddress! }
                 let sizes = buffers.map { $0.count }
@@ -225,7 +232,7 @@ final class VideoDecoder: @unchecked Sendable {
                             parameterSetPointers: ptrBuf.baseAddress!,
                             parameterSetSizes: sizeBuf.baseAddress!,
                             nalUnitHeaderLength: 4,
-                            extensions: nil,
+                            extensions: extensions,
                             formatDescriptionOut: &formatDesc
                         )
                     }
@@ -254,6 +261,22 @@ final class VideoDecoder: @unchecked Sendable {
             throw VideoDecoderError.formatFailed(status)
         }
         return desc
+    }
+
+    /// HDR10 colorimetry extensions for `CMVideoFormatDescriptionCreate*`.
+    /// The PS5 emits HDR streams in BT.2020 + SMPTE-2084 PQ + BT.2020-NCL
+    /// matrix — this is the only HDR mode the protocol negotiates (see
+    /// `lib/src/launchspec.c:81` `dynamicRange:HDR`). Tagging the format
+    /// description here propagates to the decoded `CVImageBuffer` so the
+    /// renderer can pick the right colorspace and `AVDisplayManager` can
+    /// derive `AVDisplayCriteria(refreshRate:formatDescription:)` correctly.
+    private static func hdr10ExtensionsDictionary() -> CFDictionary {
+        let colorAttachments: [CFString: Any] = [
+            kCVImageBufferColorPrimariesKey:    kCVImageBufferColorPrimaries_ITU_R_2020,
+            kCVImageBufferTransferFunctionKey:  kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ,
+            kCVImageBufferYCbCrMatrixKey:       kCVImageBufferYCbCrMatrix_ITU_R_2020,
+        ]
+        return colorAttachments as CFDictionary
     }
 
     private func buildDecompressionSession(

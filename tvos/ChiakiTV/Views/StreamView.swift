@@ -59,8 +59,14 @@ struct StreamView: View {
             Color.black.ignoresSafeArea()
 
             // Live video — always-mounted so the Metal layer stays alive.
-            StreamMetalView(renderer: appState.streamSession.renderer)
-                .ignoresSafeArea()
+            // `formatDescription` propagates through to AVDisplayManager so
+            // the Apple TV negotiates an HDR + correct-refresh HDMI link.
+            StreamMetalView(
+                renderer: appState.streamSession.renderer,
+                formatDescription: appState.streamSession.formatDescription,
+                refreshRate: Float(appState.settings.fps.rawValue)
+            )
+            .ignoresSafeArea()
 
             switch appState.streamSession.state {
             case .idle, .connecting:

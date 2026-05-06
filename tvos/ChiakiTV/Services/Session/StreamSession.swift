@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import Foundation
+import CoreMedia
 import ChiakiBridgeC
 
 /// Top-level orchestration for an active streaming session. Wires the
@@ -49,6 +50,12 @@ final class StreamSession {
     /// briefly-paused stats pumps and view rebuilds.
     private(set) var connectedAt: Date? = nil
 
+    /// Latest CMFormatDescription from the decoder. Drives
+    /// `AVDisplayManager.preferredDisplayCriteria` in `StreamMetalView` so
+    /// the Apple TV negotiates an HDR + correct-refresh-rate HDMI link.
+    /// Cleared on disconnect.
+    private(set) var formatDescription: CMFormatDescription?
+
     /// Renderer + decoder are owned by the session — created in init, reused
     /// across reconnects to avoid Metal device churn.
     let renderer: MetalRenderer
@@ -77,6 +84,16 @@ final class StreamSession {
         // Hook decoder output → renderer.
         self.decoder.onPixelBuffer = { [weak self] buffer in
             self?.renderer.present(buffer)
+        }
+
+        // Hook decoder format-description → @Observable property so the
+        // SwiftUI host can drive `AVDisplayManager.preferredDisplayCriteria`
+        // (HDR + refresh-rate negotiation with the TV).
+        self.decoder.onFormatDescriptionReady = { [weak self] desc in
+            guard let self = self else { return }
+            Task { @MainActor in
+                self.formatDescription = desc
+            }
         }
 
         // Hook controller state changes → bridge.
@@ -137,6 +154,8 @@ final class StreamSession {
             }
         }()
         currentCodec = codec
+        formatDescription = nil
+        renderer.prepare(forHDR: codec == .h265HDR)
         let codecValue: Int32 = {
             switch codec {
             case .h264:    return Int32(CHIAKI_TV_CODEC_H264.rawValue)
@@ -243,6 +262,7 @@ final class StreamSession {
         latencyMs = 0
         audioBufferMs = 0
         connectedAt = nil
+        formatDescription = nil
     }
 
     /// Picks the most reachable IPv4 string we have. Empty string + literal
