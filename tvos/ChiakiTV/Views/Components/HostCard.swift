@@ -65,11 +65,12 @@ struct HostCard: View {
         .modifier(PulseShadow(active: host.state == .ready && !reduceMotion,
                               cardFocused: cardFocused,
                               rimColor: rimColor))
-        // No `.focusSection()` here. The card's focusable children
-        // (Connect / Hide / Wake / Re-pair) are addressed individually so
-        // pressing Up from Connect can escape spatially to the toolbar
-        // above, instead of being trapped in a section that has no
-        // focusable above the action row.
+        // The card is its own focus section, paired with the toolbar's
+        // focus section above. tvOS routes between sibling sections via
+        // spatial alignment, so Up from Connect → toolbar, Down from
+        // Settings → Connect. Without this, the card's buttons aren't
+        // visible to the engine as a focus destination from the toolbar.
+        .focusSection()
         .defaultFocus($focused, .connect)
         .animation(.smooth(duration: 0.28), value: cardFocused)
     }

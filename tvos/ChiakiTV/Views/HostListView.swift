@@ -39,7 +39,7 @@ struct HostListView: View {
     // actions (Add Manual Host, Settings) live on the right.
 
     private var topToolbar: some View {
-        HStack(spacing: Theme.space5) {
+        HStack(spacing: Theme.space6) {
             VStack(alignment: .leading, spacing: Theme.space1) {
                 Text("ChiakiTV")
                     .font(Theme.font(.titleLarge).weight(.semibold))
@@ -113,7 +113,7 @@ struct HostListView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, Theme.space7)
-                .padding(.top, Theme.space7)
+                .padding(.top, Theme.space8)
                 .padding(.bottom, Theme.space5)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
