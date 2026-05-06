@@ -74,7 +74,7 @@ struct HostTile: View {
         Image(systemName: host.state == .ready ? "playstation.logo" : "moon.zzz.fill")
             .resizable()
             .scaledToFit()
-            .foregroundStyle(host.state == .ready ? Theme.accent : Theme.tertiaryText)
+            .foregroundStyle(host.state == .ready ? Theme.psBlue : Theme.tertiaryText)
             .padding(20)
     }
 
