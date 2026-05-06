@@ -51,21 +51,25 @@ struct HostListView: View {
 
             Spacer()
 
-            ChiakiButton(title: "Add Manual Host", systemImage: "plus.circle.fill") {
+            Button {
                 appState.showManualHost()
+            } label: {
+                Label("Add Manual Host", systemImage: "plus.circle.fill")
+                    .labelStyle(.titleAndIcon)
             }
-            .padding(.horizontal, 6)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .padding(.trailing, 12)
 
             Button {
                 appState.showSettings()
             } label: {
                 Image(systemName: "gearshape.fill")
-                    .font(.system(size: Theme.largeIconSize - 12))
-                    .foregroundStyle(Theme.mist300)
-                    .frame(width: 80, height: 64)
-                    .contentShape(Rectangle())
+                    .font(.title2)
+                    .frame(width: 56, height: 56)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.borderless)
+            .accessibilityLabel("Settings")
             .padding(.trailing, 40)
         }
         .frame(height: Theme.toolbarHeight)

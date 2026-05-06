@@ -3,80 +3,82 @@
 import SwiftUI
 import GameController
 
-/// Settings screen with a vertical rail navigator per
-/// [`docs/ui/redesign-plan.md §4.2 + §5.2`](../../docs/ui/redesign-plan.md).
+/// Settings screen rebuilt against SwiftUI primitives per
+/// [`docs/ui/redesign-v2-report.md §C2`](../../docs/ui/redesign-v2-report.md).
 ///
-/// Five tabs (re-named + re-ordered from the original General / Video /
-/// Audio / Consoles / Controller — content unchanged in this step; row
-/// rework lives in §4.4 / Step 4):
-///
-/// 1. **Stream** — resolution, FPS, bitrate, codec, render preset.
-///    *Was "Video & Stream".*
-/// 2. **Network** — buffer, volume, weak-wifi + packet-loss thresholds.
-///    *Was "Audio". Renamed because half the rows are network diagnostics.*
-/// 3. **Controller** — DualSense / MFi diagnostic surface.
-/// 4. **Consoles** — registered host list + "Register New Console" CTA.
-/// 5. **App** — disconnect/suspend behavior, streamer mode, verbose logs,
-///    PSN account ID. *Was "General". Renamed; "General" is meaningless.*
-///
-/// The rail anchors left at 220pt; tab content fills the remaining 1700pt
-/// (resolves audit issue S1 — the centered narrow form).
+/// **What changed from v1:**
+/// - Rail items are tvOS `.buttonStyle(.card)` Buttons. No more
+///   `chiakiFocusRing` overlap or hand-rolled scale animations — the
+///   focus engine handles parallax, lift, and the system-default halo.
+/// - Tab bodies use `Form` + `Section` + `LabeledContent` instead of
+///   the custom `SettingsForm` / `SettingsRow`. Spacing, separators,
+///   and section headers come from the system.
+/// - Controls are `Picker(.segmented)`, `Slider`, `Toggle` — every
+///   one inherits `.tint(amber500)` from `applyChiakiTheme()`, with
+///   correct focus chrome and Dynamic Type for free.
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
-    @State private var selectedTab: SettingsTab = .stream
+    @State private var selectedTab: SettingsTab = {
+        #if DEBUG
+        if let raw = ProcessInfo.processInfo.environment["CHIAKITV_INITIAL_SETTINGS_TAB"],
+           let tab = SettingsTab(rawValue: raw) {
+            return tab
+        }
+        #endif
+        return .stream
+    }()
 
     var body: some View {
-        ChiakiDialogChrome(
-            title: "Settings",
-            subtitle: "* Defaults marked with (Default)",
-            onBack: { appState.showHostList() }
-        ) {
-            EmptyView()
-        } content: {
-            HStack(spacing: 0) {
+        NavigationStack {
+            HStack(alignment: .top, spacing: Theme.space6) {
                 rail
-                contentArea
+                detailContent
+                    .frame(maxWidth: 1200, alignment: .topLeading)
+            }
+            .padding(.horizontal, Theme.space7)
+            .padding(.top, Theme.space4)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .navigationTitle("Settings")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { appState.showHostList() }
+                }
             }
         }
     }
 
-    // MARK: - Vertical rail
-
     private var rail: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Theme.space2) {
             ForEach(SettingsTab.allCases) { tab in
-                SettingsRailButton(tab: tab,
-                                   isSelected: selectedTab == tab) {
-                    withAnimation(.easeInOut(duration: 0.18)) {
-                        selectedTab = tab
-                    }
+                Button {
+                    selectedTab = tab
+                } label: {
+                    Label(tab.label, systemImage: tab.icon)
+                        .labelStyle(.titleAndIcon)
+                        .lineLimit(1)
+                        .font(.system(.body, design: .default).weight(.medium))
+                        .foregroundStyle(selectedTab == tab ? Theme.amber500 : .primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, Theme.space3)
+                        .padding(.horizontal, Theme.space4)
                 }
+                .buttonStyle(.card)
             }
             Spacer()
         }
-        .frame(width: Theme.settingsRailWidth, alignment: .topLeading)
-        .padding(.top, 32)
-        .padding(.horizontal, 12)
+        .frame(width: 300, alignment: .top)
         .focusSection()
     }
 
-    // MARK: - Content area
-
     @ViewBuilder
-    private var contentArea: some View {
-        Group {
-            switch selectedTab {
-            case .stream:     VideoStreamTab()
-            case .network:    AudioTab()
-            case .controller: ControllerDiagnosticTab()
-            case .consoles:   ConsolesTab()
-            case .app:        GeneralTab()
-            }
+    private var detailContent: some View {
+        switch selectedTab {
+        case .stream:     StreamTab()
+        case .network:    NetworkTab()
+        case .controller: ControllerDiagnosticTab()
+        case .consoles:   ConsolesTab()
+        case .app:        AppTab()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(.top, 24)
-        .padding(.horizontal, 24)
-        .focusSection()
     }
 }
 
@@ -97,8 +99,6 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         }
     }
 
-    /// SF Symbol for the rail icon — kept in the same family as the
-    /// previous TabView icons so muscle memory carries over.
     var icon: String {
         switch self {
         case .stream:     return "tv"
@@ -110,142 +110,180 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     }
 }
 
-// MARK: - Rail button
+// MARK: - Stream tab
 
-private struct SettingsRailButton: View {
-    let tab: SettingsTab
-    let isSelected: Bool
-    let action: () -> Void
-
-    @FocusState private var isFocused: Bool
+private struct StreamTab: View {
+    @Environment(AppState.self) private var appState
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 14) {
-                // Active-state amber bar on the left edge.
-                Rectangle()
-                    .fill(isSelected ? Theme.amber500 : Color.clear)
-                    .frame(width: 4)
-
-                Image(systemName: tab.icon)
-                    .font(.system(size: 22, weight: .medium))
-                    .frame(width: 28)
-
-                Text(tab.label)
-                    .font(Theme.font(.titleMed))
-
-                Spacer(minLength: 0)
+        @Bindable var appState = appState
+        Form {
+            Section {
+                segmentedRow("Resolution", selection: $appState.settings.resolution,
+                             options: VideoResolution.allCases) { $0.label }
+                segmentedRow("Refresh rate", selection: $appState.settings.fps,
+                             options: VideoFPS.allCases) { $0.label }
+                segmentedRow("Codec", selection: $appState.settings.codec,
+                             options: VideoCodec.allCases) { $0.label }
+            } header: {
+                Text("Picture")
+            } footer: {
+                Text("Higher refresh rates require a 4K HDR TV connected to the Apple TV.")
             }
-            .foregroundStyle(textColor)
-            .frame(height: Theme.settingsRailItemHeight)
-            .padding(.trailing, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isFocused ? Theme.ink700
-                                    : (isSelected ? Theme.ink800.opacity(0.6)
-                                                  : Color.clear))
-            )
-            .scaleEffect(isFocused ? 1.03 : 1.0)
-        }
-        .buttonStyle(.plain)
-        .focused($isFocused)
-        .chiakiFocusRing(isFocused, cornerRadius: 12)
-        .animation(Theme.focusSpring, value: isFocused)
-    }
 
-    private var textColor: Color {
-        if isFocused { return Theme.white50 }
-        if isSelected { return Theme.amber500 }
-        return Theme.mist500
+            Section {
+                segmentedRow("Render preset", selection: $appState.settings.renderPreset,
+                             options: RenderPreset.allCases) { $0.label }
+
+                Picker("Bitrate", selection: $appState.settings.bitrateKbps) {
+                    ForEach(Array(stride(from: 2_000, through: 50_000, by: 500)), id: \.self) { v in
+                        Text("\(v / 1000) Mbps").tag(v)
+                    }
+                }
+            } header: {
+                Text("Quality")
+            } footer: {
+                Text("Higher quality costs ~1–2 ms of decode latency. Bitrate is a hard ceiling — the PS5 adapts down on a weak link.")
+            }
+
+            Section {
+                Toggle("Vertical sync", isOn: $appState.settings.verticalSync)
+            } footer: {
+                Text("Reduces tearing. Adds ~16 ms of latency.")
+            }
+        }
+        .formStyle(.grouped)
     }
 }
 
-// MARK: - General
+/// Reusable segmented-row helper. tvOS hides `Picker.title` when
+/// `.pickerStyle(.segmented)` is applied, so we wrap the picker in a
+/// `LabeledContent` to keep the label visible. Using a single helper
+/// instead of inline call-sites makes every segmented row identically
+/// shaped — a precondition for visual rhythm in a `Form`.
+@ViewBuilder
+fileprivate func segmentedRow<T: Hashable, S: RandomAccessCollection>(
+    _ label: String,
+    selection: Binding<T>,
+    options: S,
+    text: @escaping (T) -> String
+) -> some View where S.Element == T, S: Sendable {
+    LabeledContent(label) {
+        Picker("", selection: selection) {
+            ForEach(Array(options), id: \.self) { item in
+                Text(text(item)).tag(item)
+            }
+        }
+        .pickerStyle(.segmented)
+    }
+}
 
-private struct GeneralTab: View {
+// MARK: - Network tab
+
+private struct NetworkTab: View {
     @Environment(AppState.self) private var appState
 
+    var body: some View {
+        @Bindable var appState = appState
+        Form {
+            Section {
+                Picker("Audio buffer", selection: $appState.settings.audioBufferMs) {
+                    ForEach(Array(stride(from: 20, through: 500, by: 10)), id: \.self) { v in
+                        Text("\(v) ms").tag(v)
+                    }
+                }
+
+                Picker("Volume", selection: $appState.settings.audioVolume) {
+                    ForEach(Array(stride(from: 0, through: 100, by: 5)), id: \.self) { v in
+                        Text("\(v)%").tag(v)
+                    }
+                }
+            } header: {
+                Text("Audio")
+            } footer: {
+                Text("A higher buffer means smoother audio at the cost of mouth-to-ear latency.")
+            }
+
+            Section {
+                Picker("Weak Wi-Fi threshold",
+                       selection: $appState.settings.weakWifiThresholdPct) {
+                    ForEach(1...20, id: \.self) { v in
+                        Text("\(v)%").tag(v)
+                    }
+                }
+
+                Picker("Reported loss ceiling",
+                       selection: $appState.settings.packetLossReportedMax) {
+                    ForEach(1...20, id: \.self) { v in
+                        Text("\(v)%").tag(v)
+                    }
+                }
+            } header: {
+                Text("Connection diagnostics")
+            } footer: {
+                Text("Show a Wi-Fi warning when sustained packet loss exceeds the threshold. The ceiling caps reported loss in the in-stream stats overlay.")
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+// MARK: - App tab (was General)
+
+private struct AppTab: View {
+    @Environment(AppState.self) private var appState
     @State private var psnPromptShown = false
     @State private var psnDraft: String = ""
 
     var body: some View {
         @Bindable var appState = appState
-        SettingsForm {
-            SettingsRow(label: "Action On Disconnect:") {
-                Picker("", selection: $appState.settings.actionOnDisconnect) {
-                    ForEach(DisconnectAction.allCases) { Text($0.label).tag($0) }
+        Form {
+            Section {
+                segmentedRow("Action on disconnect",
+                             selection: $appState.settings.actionOnDisconnect,
+                             options: DisconnectAction.allCases) { $0.label }
+                segmentedRow("Action on suspend",
+                             selection: $appState.settings.actionOnSuspend,
+                             options: SuspendAction.allCases) { $0.label }
+                segmentedRow("Audio + Video",
+                             selection: $appState.settings.audioVideoMode,
+                             options: AudioVideoMode.allCases) { $0.label }
+            } header: {
+                Text("Behavior")
+            }
+
+            Section {
+                Button {
+                    psnDraft = appState.settings.psnAccountId
+                    psnPromptShown = true
+                } label: {
+                    HStack {
+                        Text("PSN Account-ID")
+                        Spacer()
+                        Text(appState.settings.psnAccountId.isEmpty
+                             ? "Not set"
+                             : appState.settings.psnAccountId)
+                            .font(.system(.body, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                .pickerStyle(.menu)
+            } header: {
+                Text("Account")
+            } footer: {
+                Text("12-character base64 string. The PS5 ties registrations to this account.")
             }
 
-            SettingsRow(label: "Action On Suspend:") {
-                Picker("", selection: $appState.settings.actionOnSuspend) {
-                    ForEach(SuspendAction.allCases) { Text($0.label).tag($0) }
-                }
-                .pickerStyle(.menu)
-            }
-
-            SettingsRow(label: "Audio + Video:") {
-                Picker("", selection: $appState.settings.audioVideoMode) {
-                    ForEach(AudioVideoMode.allCases) { Text($0.label).tag($0) }
-                }
-                .pickerStyle(.menu)
-            }
-
-            SettingsRow(label: "PSN Account-ID (12-char base64):") {
-                psnAccountIdButton
-            }
-
-            SettingsRow(label: "Streamer Mode:") {
-                Toggle("", isOn: $appState.settings.streamerMode)
-                    .labelsHidden()
-                    .frame(width: Theme.dialogFieldWidth, alignment: .leading)
-            }
-
-            SettingsRow(label: "Verbose Logs:") {
-                Toggle("", isOn: $appState.settings.verboseLogs)
-                    .labelsHidden()
-                    .frame(width: Theme.dialogFieldWidth, alignment: .leading)
-            }
-
-            SettingsRow(label: "Show Stream Stats:") {
-                Toggle("", isOn: $appState.settings.showStreamStats)
-                    .labelsHidden()
-                    .frame(width: Theme.dialogFieldWidth, alignment: .leading)
+            Section {
+                Toggle("Streamer Mode", isOn: $appState.settings.streamerMode)
+                Toggle("Verbose Logs", isOn: $appState.settings.verboseLogs)
+                Toggle("Show Stream Stats", isOn: $appState.settings.showStreamStats)
+            } header: {
+                Text("Diagnostics")
+            } footer: {
+                Text("Streamer Mode hides identifying details from the stream HUD. Verbose Logs writes detailed diagnostics to Console.")
             }
         }
-    }
-
-    /// PSN account ID is a base64 string. tvOS's plain `TextField` doesn't
-    /// participate cleanly in the focus engine when wrapped in a custom row
-    /// (see `RegistrationView` for the same pattern). A focusable `Button`
-    /// that pops a system `.alert` with the real `TextField` is the
-    /// reliable tvOS path.
-    private var psnAccountIdButton: some View {
-        @Bindable var appState = appState
-        return Button {
-            psnDraft = appState.settings.psnAccountId
-            psnPromptShown = true
-        } label: {
-            HStack {
-                Text(appState.settings.psnAccountId.isEmpty
-                     ? "AAAAAAAAAAAAAAAA=="
-                     : appState.settings.psnAccountId)
-                    .font(.system(size: Theme.baseFontSize))
-                    .foregroundStyle(appState.settings.psnAccountId.isEmpty
-                                     ? Theme.tertiaryText
-                                     : Theme.primaryText)
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 14)
-            .frame(width: Theme.dialogFieldWidth)
-            .background(
-                RoundedRectangle(cornerRadius: Theme.smallRadius)
-                    .fill(Theme.surface)
-            )
-        }
-        .buttonStyle(.plain)
+        .formStyle(.grouped)
         .alert("PSN Account ID", isPresented: $psnPromptShown) {
             TextField("AAAAAAAAAAAAAAAA==", text: $psnDraft)
             Button("OK") {
@@ -258,366 +296,136 @@ private struct GeneralTab: View {
     }
 }
 
-// MARK: - Stream tab (was Video & Stream)
-//
-// Cycling enums become ChiakiSegmented; the bitrate stepper becomes a slider.
-
-private struct VideoStreamTab: View {
-    @Environment(AppState.self) private var appState
-
-    var body: some View {
-        @Bindable var appState = appState
-        SettingsForm {
-            SettingsRow(label: "Resolution") {
-                ChiakiSegmented(
-                    selection: $appState.settings.resolution,
-                    options: VideoResolution.allCases,
-                    label: { $0.label }
-                )
-            }
-
-            SettingsRow(label: "Refresh rate") {
-                ChiakiSegmented(
-                    selection: $appState.settings.fps,
-                    options: VideoFPS.allCases,
-                    label: { $0.label }
-                )
-            }
-
-            SettingsRow(label: "Codec") {
-                ChiakiSegmented(
-                    selection: $appState.settings.codec,
-                    options: VideoCodec.allCases,
-                    label: { $0.label }
-                )
-            }
-
-            SettingsRow(label: "Render preset",
-                        hint: "Higher quality costs ~1–2 ms of decode latency.") {
-                ChiakiSegmented(
-                    selection: $appState.settings.renderPreset,
-                    options: RenderPreset.allCases,
-                    label: { $0.label }
-                )
-            }
-
-            SettingsRow(label: "Bitrate",
-                        hint: "Hard ceiling. The PS5 will adapt downward on a weak link.") {
-                ChiakiSlider(
-                    value: $appState.settings.bitrateKbps,
-                    range: 2_000...50_000, step: 500,
-                    format: { "\($0 / 1000) Mbps" }
-                )
-            }
-
-            SettingsRow(label: "Vertical sync",
-                        hint: "Reduces tearing. Adds ~16 ms of latency.") {
-                Toggle("", isOn: $appState.settings.verticalSync)
-                    .labelsHidden()
-                    .tint(Theme.amber500)
-            }
-        }
-    }
-}
-
-// MARK: - Network tab (was Audio)
-//
-// Audio buffer + audio volume are kept here because the Network tab is
-// "things that affect the streaming pipeline" — buffer size *is* a network
-// vs. latency tradeoff. Volume stays adjacent to buffer for ergonomic
-// reasons. The two diagnostic thresholds (weak-wifi, packet-loss-reported)
-// finally have a coherent home.
-
-private struct AudioTab: View {
-    @Environment(AppState.self) private var appState
-
-    var body: some View {
-        @Bindable var appState = appState
-        SettingsForm {
-            SettingsRow(label: "Audio buffer",
-                        hint: "Higher = smoother audio, more lag-to-mouth.") {
-                ChiakiSlider(
-                    value: $appState.settings.audioBufferMs,
-                    range: 20...500, step: 10,
-                    format: { "\($0) ms" }
-                )
-            }
-
-            SettingsRow(label: "Volume") {
-                ChiakiSlider(
-                    value: $appState.settings.audioVolume,
-                    range: 0...100, step: 5,
-                    format: { "\($0)%" }
-                )
-            }
-
-            SettingsRow(label: "Weak Wi-Fi threshold",
-                        hint: "Show a warning when sustained packet loss exceeds this percentage.") {
-                ChiakiSlider(
-                    value: $appState.settings.weakWifiThresholdPct,
-                    range: 1...20, step: 1,
-                    format: { "\($0)%" }
-                )
-            }
-
-            SettingsRow(label: "Reported loss ceiling",
-                        hint: "Cap reported packet loss in stream stats. Diagnostic.") {
-                ChiakiSlider(
-                    value: $appState.settings.packetLossReportedMax,
-                    range: 1...20, step: 1,
-                    format: { "\($0)%" }
-                )
-            }
-        }
-    }
-}
-
-// MARK: - Consoles
+// MARK: - Consoles tab
 
 private struct ConsolesTab: View {
     @Environment(AppState.self) private var appState
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.dialogRowSpacing) {
-            Text("Registered Consoles")
-                .font(.system(size: Theme.dialogTitleFontSize, weight: .bold))
-                .foregroundStyle(Theme.primaryText)
-
+        Form {
             if appState.registeredHosts.isEmpty {
-                Text("No consoles registered yet.")
-                    .font(.system(size: Theme.baseFontSize))
-                    .foregroundStyle(Theme.secondaryText)
+                Section {
+                    ContentUnavailableView(
+                        "No registered consoles",
+                        systemImage: "gamecontroller",
+                        description: Text("Pair a PS5 to use Remote Play without re-entering a PIN every time.")
+                    )
+                }
             } else {
-                ForEach(appState.registeredHosts) { host in
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text(host.nickname)
-                                .foregroundStyle(Theme.primaryText)
-                            Text(host.mac)
-                                .font(.system(size: Theme.dialogHeaderFontSize))
-                                .foregroundStyle(Theme.tertiaryText)
-                        }
-                        Spacer()
-                        ChiakiButton(title: "Delete", systemImage: "trash") {
-                            appState.registeredHosts.removeAll { $0.id == host.id }
+                Section {
+                    ForEach(appState.registeredHosts) { host in
+                        LabeledContent(host.nickname) {
+                            HStack(spacing: 16) {
+                                Text(host.mac)
+                                    .font(Theme.font(.mono))
+                                    .foregroundStyle(.secondary)
+                                Button {
+                                    appState.registeredHosts.removeAll {
+                                        $0.id == host.id
+                                    }
+                                } label: {
+                                    Label("Forget", systemImage: "trash")
+                                        .labelStyle(.iconOnly)
+                                }
+                                .buttonStyle(.card)
+                            }
                         }
                     }
-                    .padding(.vertical, 8)
-                    Divider().background(Theme.tertiaryText)
+                } header: {
+                    Text("Registered consoles")
                 }
             }
 
-            Spacer().frame(height: 20)
-
-            ChiakiButton(title: "Register New Console",
-                         systemImage: "plus.circle.fill") {
-                appState.showRegistration(for: Host(
-                    id: UUID().uuidString,
-                    nickname: "New PS5",
-                    ipAddress: ""
-                ))
-            }
-        }
-        .padding(40)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-}
-
-// MARK: - Form helpers
-//
-// The redesigned form (per docs/ui/redesign-plan.md §4.4) drops the centred-
-// narrow column layout in favour of full-bleed rows with a left-anchored
-// label and a right-anchored control. Optional `hint` adds a third line of
-// italic mist-500 sub-text under the label for non-obvious tradeoffs.
-
-private struct SettingsForm<Content: View>: View {
-    @ViewBuilder var content: () -> Content
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                content()
-            }
-            .padding(.vertical, 24)
-            .padding(.horizontal, 40)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
-        }
-    }
-}
-
-private struct SettingsRow<Trailing: View>: View {
-    let label: String
-    var hint: String? = nil
-    @ViewBuilder var trailing: () -> Trailing
-
-    init(label: String, hint: String? = nil,
-         @ViewBuilder trailing: @escaping () -> Trailing) {
-        self.label = label
-        self.hint = hint
-        self.trailing = trailing
-    }
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 24) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(label)
-                    .font(Theme.font(.titleMed))
-                    .foregroundStyle(Theme.mist300)
-                if let hint {
-                    Text(hint)
-                        .font(Theme.font(.bodySmall))
-                        .foregroundStyle(Theme.mist500)
-                        .italic()
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
+            Section {
+                Button {
+                    appState.showRegistration(for: Host(
+                        id: UUID().uuidString,
+                        nickname: "New PS5",
+                        ipAddress: ""
+                    ))
+                } label: {
+                    Label("Register a new console", systemImage: "plus.circle.fill")
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .buttonStyle(.card)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            trailing()
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 4)
+        .formStyle(.grouped)
+
     }
 }
 
-// MARK: - Controller Diagnostic
-//
-// Live-poll snapshot of every connected GCController. Shows the vendor name,
-// the concrete profile class (GCExtendedGamepad / GCDualSenseGamepad /
-// GCXboxGamepad), whether the Home button is exposed, and a button list with
-// per-button press feedback. Used to verify that Info.plist profile changes
-// surfaced new buttons (Home, Touchpad, Share) without round-tripping through
-// Console.app to read chiakiLog output.
+// MARK: - Controller diagnostic tab
+
 private struct ControllerDiagnosticTab: View {
     @State private var snapshot = ControllerSnapshot()
     @State private var pollTask: Task<Void, Never>? = nil
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                if snapshot.controllers.isEmpty {
-                    emptyState
-                } else {
-                    ForEach(0..<snapshot.controllers.count, id: \.self) { idx in
-                        controllerCard(snapshot.controllers[idx])
-                    }
+        Form {
+            if snapshot.controllers.isEmpty {
+                Section {
+                    ContentUnavailableView(
+                        "No controllers connected",
+                        systemImage: "gamecontroller",
+                        description: Text("Pair a DualSense or MFi controller in tvOS Settings → Remotes & Devices.")
+                    )
+                }
+            } else {
+                ForEach(0..<snapshot.controllers.count, id: \.self) { idx in
+                    controllerSections(snapshot.controllers[idx])
                 }
             }
-            .padding(.vertical, 24)
-            .padding(.horizontal, 12)
-            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
+        .formStyle(.grouped)
+
         .onAppear { startPolling() }
         .onDisappear { stopPolling() }
     }
 
-    private var emptyState: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "gamecontroller")
-                .font(.system(size: 80, weight: .light))
-                .foregroundStyle(Theme.mist500)
-            Text("No controllers connected.")
-                .font(Theme.font(.titleMed))
-                .foregroundStyle(Theme.mist300)
-            Text("Pair a DualSense or MFi controller in tvOS Settings → Remotes & Devices.")
-                .font(Theme.font(.bodyMed))
-                .foregroundStyle(Theme.mist500)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 80)
-    }
-
     @ViewBuilder
-    private func controllerCard(_ c: ControllerSnapshot.Entry) -> some View {
-        VStack(alignment: .leading, spacing: 18) {
-            // Header — vendor name big, profile + home-status as adjacent chips.
-            VStack(alignment: .leading, spacing: 8) {
-                Text(c.vendorName)
-                    .font(Theme.font(.displaySmall))
-                    .foregroundStyle(Theme.white50)
-                HStack(spacing: 10) {
-                    statusChip(label: c.profileClass,
-                               color: Theme.psBlue, glyph: "rectangle.connected.to.line.below")
-                    statusChip(label: c.hasHome ? "HOME EXPOSED" : "HOME NOT EXPOSED",
-                               color: c.hasHome ? Theme.green500 : Theme.rose500,
-                               glyph: c.hasHome ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                }
+    private func controllerSections(_ c: ControllerSnapshot.Entry) -> some View {
+        Section {
+            LabeledContent("Profile") {
+                Text(c.profileClass)
+                    .font(Theme.font(.mono))
+                    .foregroundStyle(.secondary)
             }
 
-            // Button cluster grid.
-            buttonClusters(for: c)
+            LabeledContent("Home button") {
+                if c.hasHome {
+                    Label("Exposed", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(Theme.green500)
+                } else {
+                    Label("Not exposed", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(Theme.rose500)
+                }
+            }
+        } header: {
+            Text(c.vendorName)
+        } footer: {
+            if !c.hasHome {
+                Text("Long-press the Options button (Create on DualSense, View on Xbox) past 0.6 s to reach the PS5's PS button while streaming.")
+            }
         }
-        .padding(28)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
-                .fill(Theme.ink800)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
-                .stroke(Theme.ink600, lineWidth: 1)
-        )
-    }
 
-    /// Renders the button list grouped by physical cluster. Resolves audit
-    /// issue Co1 (alphabetical sort scattered logically-grouped inputs).
-    private func buttonClusters(for c: ControllerSnapshot.Entry) -> some View {
         let groups = ControllerSnapshot.cluster(buttons: c.buttons)
-        return VStack(alignment: .leading, spacing: 16) {
-            ForEach(groups) { group in
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(group.title.uppercased())
-                        .font(Theme.font(.caption))
-                        .foregroundStyle(Theme.mist500)
-                        .tracking(1.4)
-
-                    LazyVGrid(columns: [
-                        GridItem(.adaptive(minimum: 220, maximum: 320), spacing: 6)
-                    ], alignment: .leading, spacing: 6) {
-                        ForEach(0..<group.buttons.count, id: \.self) { i in
-                            buttonRow(group.buttons[i])
-                        }
+        ForEach(groups) { group in
+            Section {
+                ForEach(0..<group.buttons.count, id: \.self) { i in
+                    let b = group.buttons[i]
+                    LabeledContent(b.name) {
+                        Image(systemName: b.pressed
+                              ? "circle.fill" : "circle")
+                            .foregroundStyle(b.pressed
+                                             ? Theme.green500
+                                             : .secondary)
                     }
                 }
+            } header: {
+                Text(group.title)
             }
         }
-    }
-
-    private func buttonRow(_ b: ControllerSnapshot.Button) -> some View {
-        HStack(spacing: 10) {
-            Circle()
-                .fill(b.pressed ? Theme.green500 : Theme.ink600)
-                .frame(width: 10, height: 10)
-                .shadow(color: b.pressed ? Theme.green500.opacity(0.6) : .clear,
-                        radius: 5)
-            Text(b.name)
-                .font(Theme.font(.bodyMed))
-                .foregroundStyle(b.pressed ? Theme.white50 : Theme.mist500)
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-    }
-
-    private func statusChip(label: String, color: Color, glyph: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: glyph)
-                .font(.system(size: 14, weight: .semibold))
-            Text(label)
-                .font(Theme.font(.monoSmall))
-                .tracking(1.0)
-        }
-        .foregroundStyle(color)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(
-            Capsule().fill(color.opacity(0.12))
-        )
-        .overlay(
-            Capsule().stroke(color.opacity(0.5), lineWidth: 1)
-        )
     }
 
     private func startPolling() {
@@ -636,6 +444,8 @@ private struct ControllerDiagnosticTab: View {
     }
 }
 
+// MARK: - Controller snapshot
+
 private struct ControllerSnapshot {
     var controllers: [Entry] = []
 
@@ -651,9 +461,6 @@ private struct ControllerSnapshot {
         let pressed: Bool
     }
 
-    /// A logically-grouped subset of inputs. Used by the redesigned
-    /// diagnostic to render thumb cluster / d-pad / etc as separate groups
-    /// instead of one alphabetical wall of text.
     struct Group: Identifiable {
         let id = UUID()
         let title: String
@@ -679,23 +486,16 @@ private struct ControllerSnapshot {
         return ControllerSnapshot(controllers: entries)
     }
 
-    /// Bucket the alphabetical button list by physical cluster. Anything
-    /// that doesn't match a known cluster lands in "Other" so the grouping
-    /// stays loss-less even when GameController surfaces a vendor-specific
-    /// input we didn't anticipate.
     static func cluster(buttons: [Button]) -> [Group] {
-        // Match against substrings of GCController's input identifiers
-        // (GCInputButtonA / GCInputDirectionPadUp / etc), which are
-        // mostly stable across MFi profiles.
         let buckets: [(title: String, contains: [String])] = [
-            ("Face buttons",  ["Button A", "Button B", "Button X", "Button Y"]),
-            ("D-pad",         ["Direction Pad"]),
-            ("Shoulders",     ["Left Shoulder", "Right Shoulder",
-                               "Left Trigger",  "Right Trigger"]),
-            ("Left stick",    ["Left Thumbstick"]),
-            ("Right stick",   ["Right Thumbstick"]),
-            ("System",        ["Button Menu", "Button Options", "Button Home",
-                               "Button Share", "Touchpad"])
+            ("Face buttons", ["Button A", "Button B", "Button X", "Button Y"]),
+            ("D-pad",        ["Direction Pad"]),
+            ("Shoulders",    ["Left Shoulder", "Right Shoulder",
+                              "Left Trigger",  "Right Trigger"]),
+            ("Left stick",   ["Left Thumbstick"]),
+            ("Right stick",  ["Right Thumbstick"]),
+            ("System",       ["Button Menu", "Button Options", "Button Home",
+                              "Button Share", "Touchpad"])
         ]
 
         var assigned = Set<String>()
@@ -710,7 +510,6 @@ private struct ControllerSnapshot {
             }
         }
 
-        // Anything left over.
         let leftovers = buttons.filter { !assigned.contains($0.name) }
         if !leftovers.isEmpty {
             groups.append(Group(title: "Other", buttons: leftovers))

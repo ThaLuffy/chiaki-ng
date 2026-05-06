@@ -2,23 +2,36 @@
 
 import SwiftUI
 
-/// Hero card representing a single PS5. Replaces `HostTile` per
-/// [`docs/ui/redesign-plan.md §4.1`](../../../docs/ui/redesign-plan.md).
+/// Hero card for one PS5 on the LAN. v3 redesign — see
+/// [`docs/ui/redesign-v3/01-host-card.md`](../../../docs/ui/redesign-v3/01-host-card.md)
+/// for design rationale + citations.
 ///
-/// **Layout** (1180 × 460 pt, three columns, all the same height):
+/// **Layout** (single-axis vertical hierarchy, all left-aligned):
 ///
-/// 1. **Console portrait** (380 pt) — large `playstation.logo` glyph backed
-///    by a soft radial that takes the host's rim color (amber/ready,
-///    blue/standby, rose/unreachable).
-/// 2. **Identity stack** (flex) — 72-pt nickname, state chip, then a
-///    label-on-the-left / mono-value-on-the-right metadata table.
-/// 3. **Action stack** (240 pt) — full-bleed CONNECT button up top,
-///    Wake / Edit / Forget glyph row below.
+/// ```
+/// ┌──────────────────────────────────────────────────────────┐
+/// │  PS5-860                                                 │
+/// │  ● READY                                                 │
+/// │                                                          │
+/// │  Address     192.168.2.26                                │
+/// │  MAC         78:C8:81:D7:10:99                           │
+/// │  Origin      Discovered                                  │
+/// │                                                          │
+/// │  ┌──────────────┐   ┌──────┐   ┌──────┐                  │
+/// │  │  CONNECT  →  │   │ Wake │   │ Hide │                  │
+/// │  └──────────────┘   └──────┘   └──────┘                  │
+/// └──────────────────────────────────────────────────────────┘
+/// ```
 ///
-/// **Focus behaviour:** the card itself is a `focusSection()` — the focus
-/// engine moves into it as a unit, then routes between the four
-/// inline buttons (`connect / wake / edit / forget`). The card's *rim*
-/// brightens when any of its descendants is focused.
+/// - Single column, left-aligned. Body content is never centered (see
+///   [Pimp My Type — *Avoid centered text*](https://pimpmytype.com/avoid-centered-text/)
+///   and [UX Movement — *Why You Should Never Center Align Paragraph
+///   Text*](https://uxmovement.com/content/why-you-should-never-center-align-paragraph-text/)).
+/// - Hierarchy via type scale + spacing only — no decorative dividers.
+///   Title (largeTitle) → state chip (caption mono) → metadata table
+///   (body) → primary action.
+/// - All padding on the 8pt grid: `space4` (16pt) interior gutter,
+///   `space5` (24pt) between groups, `space7` (48pt) outer.
 struct HostCard: View {
     let host: Host
     var onConnect:    () -> Void = {}
@@ -26,255 +39,186 @@ struct HostCard: View {
     var onUpdatePin:  () -> Void = {}
     var onForget:     () -> Void = {}
 
-    /// Inline-action focus key. The card's `@FocusState` reads this so the
-    /// rim treatment knows *which* descendant is focused (not just whether).
-    private enum Action: Hashable { case connect, wake, edit, forget }
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @FocusState private var focused: Action?
+    private enum Action: Hashable { case connect, wake, edit, forget }
     private var cardFocused: Bool { focused != nil }
 
-    /// Drives the discovery-bloom — on first appearance the card briefly
-    /// outsets an amber halo before settling into its rest state. Visual
-    /// chain of causation: "we just found this PS5". Per redesign-plan §6.
-    @State private var bloomActive = false
+    private enum PulsePhase: CaseIterable { case dim, bright }
 
     var body: some View {
-        HStack(spacing: 0) {
-            consolePortrait
-                .frame(width: Theme.hostCardConsoleWidth)
+        HStack(alignment: .top, spacing: Theme.space6) {
+            consoleAccent
 
-            identityStack
-                .frame(maxWidth: .infinity)
-
-            actionStack
-                .frame(width: Theme.hostCardActionWidth)
+            VStack(alignment: .leading, spacing: Theme.space6) {
+                header
+                metadata
+                actionRow
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(width: Theme.hostCardWidth, height: Theme.hostCardHeight)
+        .padding(Theme.space7)
+        .frame(maxWidth: 1280, alignment: .leading)
         .background(cardBackground)
         .overlay(rimBorder)
-        .shadow(color: rimColor.opacity(shadowOpacity),
-                radius: shadowRadius, x: 0, y: 0)
+        .modifier(PulseShadow(active: host.state == .ready && !reduceMotion,
+                              cardFocused: cardFocused,
+                              rimColor: rimColor))
         .focusSection()
         .defaultFocus($focused, .connect)
-        .animation(Theme.focusSpring, value: cardFocused)
-        .animation(.easeOut(duration: 0.62), value: bloomActive)
-        .onAppear {
-            // Two-stage: bloom on for 380ms, then settle. The .easeOut on
-            // bloomActive carries the shadow opacity/radius values back
-            // down to their resting values smoothly.
-            bloomActive = true
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(380))
-                bloomActive = false
-            }
-        }
+        .animation(.smooth(duration: 0.28), value: cardFocused)
     }
 
-    /// Combined shadow-opacity ramp: focused state + bloom both contribute.
-    private var shadowOpacity: Double {
-        if bloomActive { return 0.65 }
-        return cardFocused ? 0.45 : 0.18
-    }
+    // MARK: - Console accent — small visual anchor on the left
+    //
+    // Per Layout Scene's 2026 card guide, a card benefits from a single
+    // visual anchor that *complements* the text hierarchy rather than
+    // competing with it. The PS logo is small (88×88pt vs the previous
+    // 380pt column) and sits inside the same baseline grid as the title.
 
-    private var shadowRadius: CGFloat {
-        if bloomActive { return 56 }
-        return cardFocused ? 40 : 22
-    }
-
-    // MARK: - Console portrait
-
-    private var consolePortrait: some View {
+    private var consoleAccent: some View {
         ZStack {
-            // Soft state-tinted glow behind the icon.
-            RadialGradient(
-                colors: [rimColor.opacity(host.state == .ready ? 0.28 : 0.10),
-                         Color.clear],
-                center: .center,
-                startRadius: 40,
-                endRadius: 240
-            )
-
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(rimColor.opacity(0.16))
+                .frame(width: 88, height: 88)
             Image(systemName: host.state == .ready ? "playstation.logo"
                                                    : "moon.zzz.fill")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 200, height: 200)
+                .font(.system(size: 44, weight: .medium))
                 .foregroundStyle(host.state == .ready ? Theme.psBlue
-                                                      : Theme.mist500)
+                                                      : .secondary)
         }
     }
 
-    // MARK: - Identity stack
+    // MARK: - Header — title + state chip
+    //
+    // Title and state form the "scannable in 200ms" zone (Layout Scene,
+    // *Mastering Card UI Design Patterns 2026*). Title is the largest
+    // type on screen; state chip is right under it, semantic-color coded.
 
-    private var identityStack: some View {
-        VStack(alignment: .leading, spacing: 28) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(host.nickname)
-                    .font(Theme.font(.displayLarge))
-                    .foregroundStyle(Theme.white50)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
+    private var header: some View {
+        VStack(alignment: .leading, spacing: Theme.space2) {
+            Text(host.nickname)
+                .font(.system(.largeTitle, design: .default).weight(.bold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
 
-                stateChip
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                identityRow("ADDRESS",
-                            host.ipAddress.isEmpty ? "—" : host.ipAddress)
-                identityRow("ID",
-                            host.mac.isEmpty ? "—" : host.mac)
-                identityRow("ORIGIN",
-                            discoveryTag.uppercased())
-            }
+            stateChip
         }
-        .padding(.vertical, 36)
-        .padding(.horizontal, 32)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var stateChip: some View {
         let (label, color): (String, Color) = {
             switch host.state {
-            case .ready:   return ("READY",        Theme.green500)
-            case .standby: return ("STANDBY",      Theme.psBlue)
-            case .unknown: return ("UNREACHABLE",  Theme.rose500)
+            case .ready:   return ("READY",       Theme.green500)
+            case .standby: return ("STANDBY",     Theme.psBlue)
+            case .unknown: return ("UNREACHABLE", Theme.rose500)
             }
         }()
 
-        return HStack(spacing: 10) {
+        return HStack(spacing: Theme.space2) {
             Circle()
                 .fill(color)
                 .frame(width: 10, height: 10)
                 .shadow(color: color.opacity(0.6), radius: 6)
-
             Text(label)
-                .font(Theme.font(.monoSmall))
+                .font(.system(.footnote, design: .monospaced).weight(.semibold))
                 .foregroundStyle(color)
-                .tracking(1.2)
+                .tracking(1.0)
         }
     }
 
-    private func identityRow(_ label: String, _ value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 16) {
+    // MARK: - Metadata — uniform Address/MAC/Origin table
+    //
+    // Two-column key/value table. Label column is fixed-width so values
+    // align on a single vertical edge — required for visual rhythm in
+    // multi-row tables (LearnUI, *3 Pro Tips on Alignment*). Values are
+    // monospaced so digits stack cleanly.
+
+    private var metadata: some View {
+        VStack(alignment: .leading, spacing: Theme.space2) {
+            metadataRow(label: "Address",
+                        value: host.ipAddress.isEmpty ? "—" : host.ipAddress)
+            metadataRow(label: "MAC",
+                        value: host.mac.isEmpty ? "—" : host.mac)
+            metadataRow(label: "Origin",
+                        value: discoveryTag)
+        }
+    }
+
+    private func metadataRow(label: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: Theme.space5) {
             Text(label)
-                .font(Theme.font(.caption))
-                .foregroundStyle(Theme.mist500)
-                .tracking(1.4)
-                .frame(width: 84, alignment: .leading)
+                .font(.system(.body, design: .default).weight(.medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 160, alignment: .leading)
 
             Text(value)
-                .font(Theme.font(.monoMed))
-                .foregroundStyle(Theme.mist300)
+                .font(.system(.body, design: .monospaced))
+                .foregroundStyle(.primary)
                 .lineLimit(1)
+                .truncationMode(.tail)
         }
     }
 
-    // MARK: - Action stack
+    // MARK: - Action row — primary CONNECT + secondary actions
 
-    private var actionStack: some View {
-        VStack(alignment: .center, spacing: 18) {
-            primaryConnectButton
-
-            secondaryActionRow
-                .opacity(cardFocused ? 1.0 : 0.55)
-                .animation(.easeOut(duration: 0.18), value: cardFocused)
-        }
-        .frame(maxHeight: .infinity)
-        .padding(.vertical, 40)
-        .padding(.horizontal, 16)
-    }
-
-    private var primaryConnectButton: some View {
-        let isFocused = (focused == .connect)
-        return Button(action: onConnect) {
-            HStack(spacing: 10) {
-                Text("CONNECT")
-                    .font(Theme.font(.titleMed).weight(.bold))
-                    .tracking(1.2)
-                Image(systemName: "arrow.right.circle.fill")
-                    .font(.system(size: 26, weight: .semibold))
+    private var actionRow: some View {
+        HStack(spacing: Theme.space4) {
+            Button(action: onConnect) {
+                Label("Connect", systemImage: "play.fill")
+                    .font(.system(.body, design: .default).weight(.semibold))
+                    .padding(.horizontal, Theme.space2)
             }
-            .foregroundStyle(Theme.ink900)
-            .frame(maxWidth: .infinity, minHeight: 88)
-            .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(LinearGradient(
-                        colors: [Theme.amber400, Theme.amber500],
-                        startPoint: .topLeading,
-                        endPoint:   .bottomTrailing
-                    ))
-            )
-            .scaleEffect(isFocused ? 1.05 : 1.0)
-        }
-        .buttonStyle(.plain)
-        .focused($focused, equals: .connect)
-        .chiakiFocusRing(isFocused, cornerRadius: 20)
-    }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .focused($focused, equals: .connect)
 
-    private var secondaryActionRow: some View {
-        HStack(spacing: 8) {
-            // "Wake" only makes sense for a registered, currently-standby host.
             if host.registered && host.state == .standby {
-                inlineGlyph(.wake, glyph: "moon.stars.fill",   title: "Wake",
-                            action: onWake)
+                secondaryButton(.wake, title: "Wake",
+                                glyph: "moon.stars.fill", action: onWake)
             }
-
-            // "Edit" (re-register / set new PIN) only for already-paired hosts.
             if host.registered {
-                inlineGlyph(.edit, glyph: "key.horizontal.fill", title: "Edit",
-                            action: onUpdatePin)
+                secondaryButton(.edit, title: "Re-pair",
+                                glyph: "key.horizontal.fill", action: onUpdatePin)
             }
-
-            inlineGlyph(.forget, glyph: "trash.fill",
-                        title: host.discovered ? "Hide" : "Forget",
-                        action: onForget)
+            secondaryButton(.forget, title: host.discovered ? "Hide" : "Forget",
+                            glyph: "trash.fill", action: onForget)
         }
+        .padding(.top, Theme.space2)
     }
 
-    private func inlineGlyph(_ key: Action, glyph: String, title: String,
-                             action: @escaping () -> Void) -> some View {
-        let isFocused = (focused == key)
-        return Button(action: action) {
-            VStack(spacing: 4) {
-                Image(systemName: glyph)
-                    .font(.system(size: 20, weight: .medium))
-                Text(title)
-                    .font(Theme.font(.bodySmall))
-            }
-            .foregroundStyle(isFocused ? Theme.white50 : Theme.mist500)
-            .frame(width: 64, height: 60)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isFocused ? Theme.amber500.opacity(0.18)
-                                    : Color.clear)
-            )
-            .scaleEffect(isFocused ? 1.08 : 1.0)
+    private func secondaryButton(_ key: Action, title: String, glyph: String,
+                                 action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: glyph)
+                .font(.system(.body, design: .default))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.bordered)
+        .controlSize(.large)
+        .tint(.secondary)
         .focused($focused, equals: key)
-        .chiakiFocusRing(isFocused, cornerRadius: 12)
     }
 
-    // MARK: - Visual helpers
+    // MARK: - Visual chrome
 
     private var cardBackground: some View {
         RoundedRectangle(cornerRadius: Theme.hostCardCorner, style: .continuous)
-            .fill(Theme.ink800)
-            .overlay(
+            .fill(.ultraThinMaterial)
+            .background(
                 RoundedRectangle(cornerRadius: Theme.hostCardCorner,
                                  style: .continuous)
-                    .fill(.ultraThinMaterial.opacity(0.35))
+                    .fill(Theme.ink800.opacity(0.65))
             )
     }
 
     private var rimBorder: some View {
         RoundedRectangle(cornerRadius: Theme.hostCardCorner, style: .continuous)
-            .stroke(rimColor.opacity(cardFocused ? 1.0 : 0.45),
+            .stroke(rimColor.opacity(cardFocused ? 1.0 : 0.35),
                     lineWidth: cardFocused ? 2 : 1)
     }
 
-    /// State-driven rim color. The "alive" cue from the plan: warm amber for
-    /// `ready`, cool ps-blue for `standby`, rose for `unreachable`.
     private var rimColor: Color {
         switch host.state {
         case .ready:   return Theme.amber500
@@ -284,19 +228,49 @@ struct HostCard: View {
     }
 
     private var discoveryTag: String {
-        if host.manual && host.discovered { return "manual + discovered" }
-        if host.manual                     { return "manual" }
-        if host.discovered                 { return "discovered" }
-        return "automatic"
+        if host.manual && host.discovered { return "Manual + Discovered" }
+        if host.manual                     { return "Manual" }
+        if host.discovered                 { return "Discovered" }
+        return "Automatic"
     }
 }
 
+/// Pulse-shadow modifier — drives the breathing rim glow on ready hosts.
+/// Extracted from `HostCard.body` so the body stays scannable.
+private struct PulseShadow: ViewModifier {
+    let active: Bool
+    let cardFocused: Bool
+    let rimColor: Color
+
+    func body(content: Content) -> some View {
+        if active {
+            PhaseAnimator([HostCard_PulsePhase.dim, .bright]) { phase in
+                content
+                    .shadow(color: rimColor.opacity(opacity(for: phase)),
+                            radius: cardFocused ? 40 : 28, x: 0, y: 0)
+            } animation: { _ in .smooth(duration: 1.4) }
+        } else {
+            content
+                .shadow(color: rimColor.opacity(cardFocused ? 0.45 : 0.18),
+                        radius: cardFocused ? 40 : 22, x: 0, y: 0)
+        }
+    }
+
+    private func opacity(for phase: HostCard_PulsePhase) -> Double {
+        if cardFocused { return phase == .bright ? 0.55 : 0.40 }
+        return phase == .bright ? 0.28 : 0.14
+    }
+}
+
+private enum HostCard_PulsePhase: CaseIterable { case dim, bright }
+
 #Preview {
-    VStack(spacing: 30) {
+    VStack(spacing: 24) {
         HostCard(host: .previewReady)
         HostCard(host: .previewStandby)
         HostCard(host: .previewManual)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .chiakiBackground()
+    .padding(80)
+    .background(Color.black)
 }

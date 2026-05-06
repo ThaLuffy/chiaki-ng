@@ -24,6 +24,22 @@ struct ContentView: View {
             }
         }
         .applyChiakiTheme()
+        .fullScreenCover(item: sheetBinding) { item in
+            ZStack {
+                Color.black.opacity(0.6).ignoresSafeArea()
+
+                sheetBody(for: item)
+                    .frame(maxWidth: 1180, maxHeight: 820)
+                    .background(
+                        RoundedRectangle(cornerRadius: 28, style: .continuous)
+                            .fill(.regularMaterial)
+                    )
+                    .padding(Theme.space8)
+            }
+            .environment(appState)
+            .applyChiakiTheme()
+            .onExitCommand { appState.dismissSheet() }
+        }
         .alert(
             confirmModel?.title ?? "",
             isPresented: confirmBinding,
@@ -85,9 +101,9 @@ struct ContentView: View {
     private var currentRoute: some View {
         switch appState.route {
         case .hostList:                  HostListView()
-        case .manualHost:                ManualHostDialog()
-        case .registration(let host):    RegistrationView(host: host)
-        case .consolePin(let hostId):    ConsolePinDialog(hostId: hostId)
+        case .manualHost:                HostListView()
+        case .registration:              HostListView()
+        case .consolePin:                HostListView()
         case .settings:                  SettingsView()
         case .stream:                    StreamView()
         case .autoConnect(let hostId):   AutoConnectView(hostId: hostId)
@@ -155,6 +171,22 @@ struct ContentView: View {
     private var remindModel: RemindDialogModel? {
         if case .remind(let model) = appState.modal { return model }
         return nil
+    }
+
+    private var sheetBinding: Binding<SheetItem?> {
+        Binding(
+            get: { appState.sheet },
+            set: { appState.sheet = $0 }
+        )
+    }
+
+    @ViewBuilder
+    private func sheetBody(for item: SheetItem) -> some View {
+        switch item {
+        case .manualHost:                ManualHostDialog()
+        case .registration(let host):    RegistrationView(host: host)
+        case .consolePin(let hostId):    ConsolePinDialog(hostId: hostId)
+        }
     }
 }
 

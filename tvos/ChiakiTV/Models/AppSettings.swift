@@ -97,7 +97,7 @@ enum DisconnectAction: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .askConfirm: return "Ask"
         case .disconnect: return "Disconnect"
-        case .sleep:      return "Put PS5 in Sleep Mode"
+        case .sleep:      return "Sleep"
         }
     }
 }
@@ -124,7 +124,7 @@ enum AudioVideoMode: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .both:      return "Audio and Video Enabled"
+        case .both:      return "Both"
         case .audioOnly: return "Audio only"
         case .videoOnly: return "Video only"
         case .disabled:  return "Disabled"
