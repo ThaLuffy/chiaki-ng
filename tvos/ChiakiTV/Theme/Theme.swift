@@ -235,9 +235,7 @@ enum Theme {
     // | space5  | 24 | section-internal vertical rhythm                      |
     // | space6  | 32 | between sections, between major UI groups             |
     // | space7  | 48 | hero zone padding, between unrelated screen regions   |
-    // | space8  | 80 | reserved (no current call sites — overscan-safe       |
-    // |         |    | inset removed per user preference; modern TVs don't   |
-    // |         |    | need it)                                              |
+    // | space8  | 80 | screen-edge inset — see `screenInset` below           |
 
     static let space1: CGFloat = 4
     static let space2: CGFloat = 8
@@ -247,6 +245,14 @@ enum Theme {
     static let space6: CGFloat = 32
     static let space7: CGFloat = 48
     static let space8: CGFloat = 80
+
+    /// Single source of truth for the gap between any top-level screen
+    /// content and the viewport edge. Use this everywhere a screen meets
+    /// the screen border — toolbar padding, hero zone padding, sheet
+    /// scrim padding, settings outer padding. Any time you find yourself
+    /// reaching for raw `.padding(.horizontal, X)` on a screen-level
+    /// container, use this instead so all screens stay visually flush.
+    static let screenInset: CGFloat = space8
 }
 
 // MARK: - View modifiers

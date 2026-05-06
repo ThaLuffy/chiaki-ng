@@ -71,7 +71,7 @@ struct HostListView: View {
             .buttonStyle(.borderless)
             .accessibilityLabel("Settings")
         }
-        .padding(.horizontal, Theme.space8)
+        .padding(.horizontal, Theme.screenInset)
         .padding(.top, Theme.space8)
         .frame(height: Theme.toolbarHeight + Theme.space8)
         .focusSection()
@@ -113,7 +113,7 @@ struct HostListView: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.horizontal, Theme.space7)
+                .padding(.horizontal, Theme.screenInset)
                 .padding(.top, Theme.space8)
                 .padding(.bottom, Theme.space5)
             }
