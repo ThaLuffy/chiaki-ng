@@ -219,6 +219,36 @@ enum Theme {
     static let cardRadius:   CGFloat = 16
     static let modalCorner:  CGFloat = 24
     static let hostCardCorner: CGFloat = 28
+
+    // MARK: - v3 Design Tokens (8pt grid)
+    //
+    // The redesign-v3 token set. All new code uses these. Names follow the
+    // spec convention recommended by `cieden.com/book/sub-atomic/spacing`
+    // (`space1..space7`) — semantic-first, never raw pixels at call site.
+    //
+    // | token   | px | use                                                   |
+    // | ------- | -- | ----------------------------------------------------- |
+    // | space1  |  4 | inline icon ↔ label gap, half-step                    |
+    // | space2  |  8 | base unit — paragraph baseline                        |
+    // | space3  | 12 | row internal padding (between label and value)        |
+    // | space4  | 16 | card internal gutter, control-row vertical padding    |
+    // | space5  | 24 | section-internal vertical rhythm                      |
+    // | space6  | 32 | between sections, between major UI groups             |
+    // | space7  | 48 | hero zone padding, between unrelated screen regions   |
+    // | space8  | 80 | tvOS HIG safe-area horizontal inset                   |
+    //
+    // Apple HIG tvOS prescribes 60pt top/bottom and 80pt side safe-area
+    // insets on overscan-prone displays. See `developer.apple.com/design/
+    // human-interface-guidelines/layout`.
+
+    static let space1: CGFloat = 4
+    static let space2: CGFloat = 8
+    static let space3: CGFloat = 12
+    static let space4: CGFloat = 16
+    static let space5: CGFloat = 24
+    static let space6: CGFloat = 32
+    static let space7: CGFloat = 48
+    static let space8: CGFloat = 80
 }
 
 // MARK: - View modifiers
@@ -301,16 +331,3 @@ extension ButtonStyle where Self == ChiakiPrimaryButtonStyle {
     static var chiakiPrimary: ChiakiPrimaryButtonStyle { ChiakiPrimaryButtonStyle() }
 }
 
-// MARK: - Deprecated helpers (slated for removal)
-
-@available(*, deprecated, message: "Use .buttonStyle(.card) for tvOS focus chrome instead.")
-extension View {
-    /// Legacy focus ring helper. Kept only so existing call sites compile
-    /// during the migration; will be removed in the final cleanup commit.
-    func chiakiFocusRing(_ isFocused: Bool, cornerRadius: CGFloat) -> some View {
-        self.overlay(
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .stroke(isFocused ? Theme.amber500 : Color.clear, lineWidth: 3)
-        )
-    }
-}
