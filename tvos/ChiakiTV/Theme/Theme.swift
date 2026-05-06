@@ -235,11 +235,9 @@ enum Theme {
     // | space5  | 24 | section-internal vertical rhythm                      |
     // | space6  | 32 | between sections, between major UI groups             |
     // | space7  | 48 | hero zone padding, between unrelated screen regions   |
-    // | space8  | 80 | tvOS HIG safe-area horizontal inset                   |
-    //
-    // Apple HIG tvOS prescribes 60pt top/bottom and 80pt side safe-area
-    // insets on overscan-prone displays. See `developer.apple.com/design/
-    // human-interface-guidelines/layout`.
+    // | space8  | 80 | reserved (no current call sites — overscan-safe       |
+    // |         |    | inset removed per user preference; modern TVs don't   |
+    // |         |    | need it)                                              |
 
     static let space1: CGFloat = 4
     static let space2: CGFloat = 8

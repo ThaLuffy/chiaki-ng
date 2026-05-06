@@ -34,7 +34,7 @@ struct ContentView: View {
                         RoundedRectangle(cornerRadius: 28, style: .continuous)
                             .fill(.regularMaterial)
                     )
-                    .padding(Theme.space8)
+                    .padding(Theme.space7)
             }
             .environment(appState)
             .applyChiakiTheme()
