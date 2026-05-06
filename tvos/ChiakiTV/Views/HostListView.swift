@@ -100,25 +100,24 @@ struct HostListView: View {
         if appState.hosts.isEmpty {
             emptyState
         } else {
-            GeometryReader { proxy in
-                ScrollView {
-                    VStack(spacing: Theme.space5) {
-                        ForEach(appState.hosts) { host in
-                            HostCard(
-                                host: host,
-                                onConnect:    { connect(to: host) },
-                                onWake:       { wakeUp(host) },
-                                onUpdatePin:  { appState.showConsolePin(hostId: host.id) },
-                                onForget:     { delete(host) }
-                            )
-                        }
+            ScrollView {
+                VStack(spacing: Theme.space5) {
+                    ForEach(appState.hosts) { host in
+                        HostCard(
+                            host: host,
+                            onConnect:    { connect(to: host) },
+                            onWake:       { wakeUp(host) },
+                            onUpdatePin:  { appState.showConsolePin(hostId: host.id) },
+                            onForget:     { delete(host) }
+                        )
                     }
-                    .frame(maxWidth: .infinity,
-                           minHeight: proxy.size.height,
-                           alignment: .center)
-                    .padding(.horizontal, Theme.screenInset)
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, Theme.screenInset)
+                .padding(.top, Theme.space8 + Theme.space5)
+                .padding(.bottom, Theme.space5)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
