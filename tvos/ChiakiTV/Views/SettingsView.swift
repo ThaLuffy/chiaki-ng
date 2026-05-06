@@ -258,7 +258,9 @@ private struct GeneralTab: View {
     }
 }
 
-// MARK: - Video & Stream
+// MARK: - Stream tab (was Video & Stream)
+//
+// Cycling enums become ChiakiSegmented; the bitrate stepper becomes a slider.
 
 private struct VideoStreamTab: View {
     @Environment(AppState.self) private var appState
@@ -266,50 +268,65 @@ private struct VideoStreamTab: View {
     var body: some View {
         @Bindable var appState = appState
         SettingsForm {
-            SettingsRow(label: "Resolution:") {
-                Picker("", selection: $appState.settings.resolution) {
-                    ForEach(VideoResolution.allCases) { Text($0.label).tag($0) }
-                }
-                .pickerStyle(.menu)
+            SettingsRow(label: "Resolution") {
+                ChiakiSegmented(
+                    selection: $appState.settings.resolution,
+                    options: VideoResolution.allCases,
+                    label: { $0.label }
+                )
             }
 
-            SettingsRow(label: "FPS:") {
-                Picker("", selection: $appState.settings.fps) {
-                    ForEach(VideoFPS.allCases) { Text($0.label).tag($0) }
-                }
-                .pickerStyle(.menu)
+            SettingsRow(label: "Refresh rate") {
+                ChiakiSegmented(
+                    selection: $appState.settings.fps,
+                    options: VideoFPS.allCases,
+                    label: { $0.label }
+                )
             }
 
-            SettingsRow(label: "Bitrate (kbps):") {
-                stepperRow(value: $appState.settings.bitrateKbps,
-                           range: 2_000...50_000, step: 500,
-                           display: "\(appState.settings.bitrateKbps)")
+            SettingsRow(label: "Codec") {
+                ChiakiSegmented(
+                    selection: $appState.settings.codec,
+                    options: VideoCodec.allCases,
+                    label: { $0.label }
+                )
             }
 
-            SettingsRow(label: "Codec:") {
-                Picker("", selection: $appState.settings.codec) {
-                    ForEach(VideoCodec.allCases) { Text($0.label).tag($0) }
-                }
-                .pickerStyle(.menu)
+            SettingsRow(label: "Render preset",
+                        hint: "Higher quality costs ~1–2 ms of decode latency.") {
+                ChiakiSegmented(
+                    selection: $appState.settings.renderPreset,
+                    options: RenderPreset.allCases,
+                    label: { $0.label }
+                )
             }
 
-            SettingsRow(label: "Render Preset:") {
-                Picker("", selection: $appState.settings.renderPreset) {
-                    ForEach(RenderPreset.allCases) { Text($0.label).tag($0) }
-                }
-                .pickerStyle(.menu)
+            SettingsRow(label: "Bitrate",
+                        hint: "Hard ceiling. The PS5 will adapt downward on a weak link.") {
+                ChiakiSlider(
+                    value: $appState.settings.bitrateKbps,
+                    range: 2_000...50_000, step: 500,
+                    format: { "\($0 / 1000) Mbps" }
+                )
             }
 
-            SettingsRow(label: "Vertical Sync:") {
+            SettingsRow(label: "Vertical sync",
+                        hint: "Reduces tearing. Adds ~16 ms of latency.") {
                 Toggle("", isOn: $appState.settings.verticalSync)
                     .labelsHidden()
-                    .frame(width: Theme.dialogFieldWidth, alignment: .leading)
+                    .tint(Theme.amber500)
             }
         }
     }
 }
 
-// MARK: - Audio
+// MARK: - Network tab (was Audio)
+//
+// Audio buffer + audio volume are kept here because the Network tab is
+// "things that affect the streaming pipeline" — buffer size *is* a network
+// vs. latency tradeoff. Volume stays adjacent to buffer for ergonomic
+// reasons. The two diagnostic thresholds (weak-wifi, packet-loss-reported)
+// finally have a coherent home.
 
 private struct AudioTab: View {
     @Environment(AppState.self) private var appState
@@ -317,39 +334,42 @@ private struct AudioTab: View {
     var body: some View {
         @Bindable var appState = appState
         SettingsForm {
-            SettingsRow(label: "Audio Buffer (ms):") {
-                stepperRow(value: $appState.settings.audioBufferMs,
-                           range: 10...500, step: 10,
-                           display: "\(appState.settings.audioBufferMs)")
+            SettingsRow(label: "Audio buffer",
+                        hint: "Higher = smoother audio, more lag-to-mouth.") {
+                ChiakiSlider(
+                    value: $appState.settings.audioBufferMs,
+                    range: 20...500, step: 10,
+                    format: { "\($0) ms" }
+                )
             }
 
-            SettingsRow(label: "Audio Volume:") {
-                stepperRow(value: $appState.settings.audioVolume,
-                           range: 0...100, step: 5,
-                           display: "\(appState.settings.audioVolume)")
+            SettingsRow(label: "Volume") {
+                ChiakiSlider(
+                    value: $appState.settings.audioVolume,
+                    range: 0...100, step: 5,
+                    format: { "\($0)%" }
+                )
             }
 
-            SettingsRow(label: "Weak Wifi Notification (% packet loss):") {
-                stepperRow(value: $appState.settings.weakWifiThresholdPct,
-                           range: 0...100, step: 1,
-                           display: "\(appState.settings.weakWifiThresholdPct)")
+            SettingsRow(label: "Weak Wi-Fi threshold",
+                        hint: "Show a warning when sustained packet loss exceeds this percentage.") {
+                ChiakiSlider(
+                    value: $appState.settings.weakWifiThresholdPct,
+                    range: 1...20, step: 1,
+                    format: { "\($0)%" }
+                )
             }
 
-            SettingsRow(label: "Packet Loss Reported Max:") {
-                stepperRow(value: $appState.settings.packetLossReportedMax,
-                           range: 0...100, step: 1,
-                           display: "\(appState.settings.packetLossReportedMax)")
+            SettingsRow(label: "Reported loss ceiling",
+                        hint: "Cap reported packet loss in stream stats. Diagnostic.") {
+                ChiakiSlider(
+                    value: $appState.settings.packetLossReportedMax,
+                    range: 1...20, step: 1,
+                    format: { "\($0)%" }
+                )
             }
         }
     }
-}
-
-// MARK: - Stepper helper
-
-private func stepperRow(value: Binding<Int>, range: ClosedRange<Int>,
-                        step: Int, display: String) -> some View {
-    ChiakiStepper(value: value, range: range, step: step)
-        .frame(width: Theme.dialogFieldWidth, alignment: .leading)
 }
 
 // MARK: - Consoles
@@ -404,33 +424,60 @@ private struct ConsolesTab: View {
 }
 
 // MARK: - Form helpers
+//
+// The redesigned form (per docs/ui/redesign-plan.md §4.4) drops the centred-
+// narrow column layout in favour of full-bleed rows with a left-anchored
+// label and a right-anchored control. Optional `hint` adds a third line of
+// italic mist-500 sub-text under the label for non-obvious tradeoffs.
 
 private struct SettingsForm<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Theme.dialogRowSpacing) {
+            VStack(alignment: .leading, spacing: 12) {
                 content()
             }
-            .padding(40)
+            .padding(.vertical, 24)
+            .padding(.horizontal, 40)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
     }
 }
 
 private struct SettingsRow<Trailing: View>: View {
     let label: String
+    var hint: String? = nil
     @ViewBuilder var trailing: () -> Trailing
 
+    init(label: String, hint: String? = nil,
+         @ViewBuilder trailing: @escaping () -> Trailing) {
+        self.label = label
+        self.hint = hint
+        self.trailing = trailing
+    }
+
     var body: some View {
-        HStack(alignment: .center, spacing: Theme.dialogColumnSpacing) {
-            Text(label)
-                .font(.system(size: Theme.baseFontSize))
-                .foregroundStyle(Theme.primaryText)
-                .frame(width: 360, alignment: .trailing)
+        HStack(alignment: .center, spacing: 24) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(label)
+                    .font(Theme.font(.titleMed))
+                    .foregroundStyle(Theme.mist300)
+                if let hint {
+                    Text(hint)
+                        .font(Theme.font(.bodySmall))
+                        .foregroundStyle(Theme.mist500)
+                        .italic()
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
             trailing()
-            Spacer()
         }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 4)
     }
 }
 
