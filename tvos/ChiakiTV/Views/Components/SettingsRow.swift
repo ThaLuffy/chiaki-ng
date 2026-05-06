@@ -55,7 +55,7 @@ struct SettingsRow<Value: View>: View {
         }
         .frame(minHeight: minRowHeight)
         .listRowBackground(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Color.white.opacity(0.05))
         )
     }
