@@ -35,7 +35,14 @@ struct SettingsView: View {
                 detailContent
                     .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            .padding(.horizontal, Theme.screenInset)
+            // No horizontal padding here — NavigationStack already
+            // applies its own ~80pt safe-area inset on tvOS for its
+            // toolbar / titlebar chrome. Adding screenInset on top would
+            // double the visible margin (and was the source of the
+            // Home-vs-Settings inconsistency the user flagged: Home
+            // ignores safe area, Settings respects it, so the same 80pt
+            // padding token rendered as ~80pt on Home but ~165pt on
+            // Settings).
             .padding(.top, Theme.space6)
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .navigationTitle("Settings")
