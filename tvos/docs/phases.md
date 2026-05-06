@@ -42,13 +42,16 @@ Major workstreams (rough order):
 
 Phase 1 success criteria: 4K HEVC video + stereo Opus audio + DualSense control via the desktop chiaki-ng's same `lib/` API surface, on real hardware, without rebasic protocol fixes.
 
-## Phase 2 — Polish (deferred)
+## Phase 2 — Polish
 
-- DualSense haptics + adaptive triggers via `GCDualSenseGamepad`.
-- HDR10 metadata propagation (`AVDisplayCriteria(refreshRate:formatDescription:)`).
-- 4K60 verification at sustained bitrate.
-- LAN discovery surfaced in the host list (currently we'd manual-host-entry only).
-- In-stream menu overlay (long-press of the PS button to open).
+- ~~**HDR10 metadata propagation** (`AVDisplayCriteria(refreshRate:formatDescription:)`).~~ ✅ implemented 2026-05-06.
+  - `VideoDecoder.buildFormatDescription` tags HEVC `CMFormatDescription` with BT.2020 / SMPTE-2084 PQ / BT.2020-NCL extensions when codec is `.h265HDR` ([`VideoDecoder.swift:266`](../ChiakiTV/Services/Video/VideoDecoder.swift)).
+  - `MetalRenderer.applyHDRConfig` switches the `MTKView` drawable to `.bgr10a2Unorm` and the layer colorspace to `CGColorSpace.itur_2100_PQ` for HDR sessions ([`MetalRenderer.swift`](../ChiakiTV/Services/Video/MetalRenderer.swift)). 16-bit plane textures (`r16Unorm` / `rg16Unorm`) feed the new `fs_p010_hdr` BT.2020 fragment shader ([`VideoShaders.metal`](../ChiakiTV/Services/Video/VideoShaders.metal)).
+  - `StreamMetalView.applyDisplayCriteria` calls `UIWindow.avDisplayManager.preferredDisplayCriteria = AVDisplayCriteria(refreshRate:formatDescription:)` (tvOS 17+) so tvOS renegotiates the HDMI link to HDR + correct refresh rate ([`StreamMetalView.swift`](../ChiakiTV/Services/Video/StreamMetalView.swift)). Hardware verify required.
+- ~~**4K60 default profile.**~~ ✅ implemented 2026-05-06. `AppSettings` defaults flipped to `.res2160p` / `.fps60` / `.h265hdr` / `30000 kbps` ([`AppSettings.swift`](../ChiakiTV/Models/AppSettings.swift)). chiaki-lib's preset table caps at 1080p (`lib/src/session.c:92-122`); we set width/height/fps directly on `ChiakiConnectVideoProfile` and rely on `video_profile_auto_downgrade=true` if the PS5 rejects 4K60. Hardware verify required.
+- DualSense haptics + adaptive triggers via `GCDualSenseGamepad` (deferred).
+- LAN discovery surfaced in the host list (currently manual-host-entry only) (deferred).
+- In-stream menu overlay (long-press of the PS button to open) — already wired in Phase 1 (`appState.streamMenuOpen` + `StreamMenuOverlay`).
 
 ## Out of scope (explicitly dropped — not deferred)
 

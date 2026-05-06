@@ -65,15 +65,23 @@ Borrowed from the sibling project's hardware-tested config:
 | `VTDecompressionSessionDecodeFrame` flags | `[]` (synchronous) | Output handler runs before `DecodeFrame` returns; serialize on a dedicated `decoderQueue` |
 | Pre-decoder backpressure | none | The renderer's single-slot `pendingPixelBuffer` is the natural drop-newest boundary |
 
-## HDR10 metadata
+## HDR10 path
 
-The PS5 emits HDR10 mastering display metadata (SEI) inside the HEVC bitstream. The Swift side extracts the metadata SEIs and propagates them to the `CMFormatDescription` extensions:
+The PS5 emits HDR streams as BT.2020 + SMPTE-2084 PQ + BT.2020-NCL Y'CbCr (`lib/src/launchspec.c:81` `dynamicRange:HDR`). Three independent things have to line up for the Apple TV to display HDR correctly:
 
-- `kCVImageBufferColorPrimariesKey = kCVImageBufferColorPrimaries_ITU_R_2020`
-- `kCVImageBufferTransferFunctionKey = kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ`
-- `kCVImageBufferYCbCrMatrixKey = kCVImageBufferYCbCrMatrix_ITU_R_2020`
+1. **`CMFormatDescription` extensions.** [`VideoDecoder.swift`](../../ChiakiTV/Services/Video/VideoDecoder.swift) (`hdr10ExtensionsDictionary` + `buildFormatDescription`) injects the colorimetry into the format description for HEVC HDR streams. VideoToolbox carries those tags onto the decoded `CVPixelBuffer`:
 
-…then sets `UIWindow.avDisplayManager.preferredDisplayCriteria = AVDisplayCriteria(refreshRate:formatDescription:)` so the Apple TV negotiates a 60 Hz HDR mode with the TV.
+   - `kCVImageBufferColorPrimariesKey = kCVImageBufferColorPrimaries_ITU_R_2020`
+   - `kCVImageBufferTransferFunctionKey = kCVImageBufferTransferFunction_SMPTE_ST_2084_PQ`
+   - `kCVImageBufferYCbCrMatrixKey = kCVImageBufferYCbCrMatrix_ITU_R_2020`
+
+2. **Renderer + shader.** [`MetalRenderer.swift`](../../ChiakiTV/Services/Video/MetalRenderer.swift) `applyHDRConfig` switches the `MTKView` drawable to `.bgr10a2Unorm` and the layer colorspace to `CGColorSpace.itur_2100_PQ` for HDR sessions. Plane textures are bound as `r16Unorm` (Y) / `rg16Unorm` (CbCr) for P010 input. The `fs_p010_hdr` fragment shader in [`VideoShaders.metal`](../../ChiakiTV/Services/Video/VideoShaders.metal) applies the BT.2020 limited-range matrix and outputs PQ-encoded R'G'B' directly — the layer's PQ colorspace tag tells the compositor the values are PQ-encoded, so no inverse-PQ + tone-map round-trip is needed.
+
+   `wantsExtendedDynamicRangeContent` is **iOS / macOS only**; on tvOS, HDR delivery is gated by the layer's colorspace + the AVDisplayCriteria below. A 10-bit drawable + Rec.2020 PQ is sufficient.
+
+3. **HDMI link negotiation.** [`StreamMetalView.swift`](../../ChiakiTV/Services/Video/StreamMetalView.swift) sets `UIWindow.avDisplayManager.preferredDisplayCriteria = AVDisplayCriteria(refreshRate:formatDescription:)` (tvOS 17+) whenever `StreamSession.formatDescription` updates. tvOS uses the format description's color tags + the requested refresh rate to switch the HDMI link to HDR + 60 Hz. The criteria is cleared on `dismantleUIView` so a future SDR app on the same Apple TV doesn't get pinned to HDR.
+
+The session's preferred FPS comes from `AppSettings.fps`; defaults flip to `.res2160p` / `.fps60` / `.h265hdr` / 30 Mbps for the personal-use Apple TV 4K 3rd gen target. chiaki-lib's preset table caps at 1080p (`lib/src/session.c:92-122`), so we set width/height/fps directly on `ChiakiConnectVideoProfile` and rely on `video_profile_auto_downgrade=true` to negotiate down if the PS5 rejects the request.
 
 ## What goes wrong here
 
