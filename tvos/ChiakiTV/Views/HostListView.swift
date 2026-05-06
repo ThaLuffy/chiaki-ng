@@ -71,8 +71,8 @@ struct HostListView: View {
             .accessibilityLabel("Settings")
         }
         .padding(.horizontal, Theme.space7)
-        .padding(.top, Theme.space5)
-        .frame(height: Theme.toolbarHeight + Theme.space5)
+        .padding(.top, Theme.space8)
+        .frame(height: Theme.toolbarHeight + Theme.space8)
         .focusSection()
     }
 
