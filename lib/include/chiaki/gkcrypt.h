@@ -45,6 +45,14 @@ typedef struct chiaki_gkcrypt_t {
 	uint8_t key_gmac_current[CHIAKI_GKCRYPT_BLOCK_SIZE];
 	uint64_t key_gmac_index_current;
 	ChiakiLog *log;
+
+	/* Pre-allocated per-instance crypto contexts — reused across every
+	 * encrypt / GMAC call so the streaming hot path doesn't malloc + free
+	 * an EVP_CIPHER_CTX per UDP packet. Typed as void* in the public
+	 * header to avoid leaking the OpenSSL/mbedTLS header dependency. NULL
+	 * on the mbedTLS build (it stack-allocates contexts cheaply enough). */
+	void *keystream_ctx; /* EVP_CIPHER_CTX *, for AES-128-ECB keystream */
+	void *gmac_ctx;      /* EVP_CIPHER_CTX *, for AES-128-GCM GMAC */
 } ChiakiGKCrypt;
 
 struct chiaki_session_t;

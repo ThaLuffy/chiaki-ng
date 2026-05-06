@@ -36,6 +36,26 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_gkcrypt_init(ChiakiGKCrypt *gkcrypt, Chiaki
 	gkcrypt->key_buf_start_offset = 0;
 	gkcrypt->last_key_pos = 0;
 	gkcrypt->key_buf_thread_stop = false;
+	gkcrypt->keystream_ctx = NULL;
+	gkcrypt->gmac_ctx = NULL;
+
+#ifndef CHIAKI_LIB_ENABLE_MBEDTLS
+	/* Pre-allocate the EVP_CIPHER_CTX instances used by the streaming
+	 * hot path. Reusing them across packets eliminates a malloc + free
+	 * per encrypt and per GMAC; chiaki's takion thread + congestion-
+	 * control thread already serialize access via gkcrypt-side mutexes,
+	 * so the contexts are safe to reuse without further locking. */
+	gkcrypt->keystream_ctx = EVP_CIPHER_CTX_new();
+	gkcrypt->gmac_ctx      = EVP_CIPHER_CTX_new();
+	if(!gkcrypt->keystream_ctx || !gkcrypt->gmac_ctx)
+	{
+		if(gkcrypt->keystream_ctx) EVP_CIPHER_CTX_free(gkcrypt->keystream_ctx);
+		if(gkcrypt->gmac_ctx)      EVP_CIPHER_CTX_free(gkcrypt->gmac_ctx);
+		gkcrypt->keystream_ctx = NULL;
+		gkcrypt->gmac_ctx = NULL;
+		return CHIAKI_ERR_MEMORY;
+	}
+#endif
 
 	ChiakiErrorCode err;
 	if(gkcrypt->key_buf_size)
@@ -106,6 +126,18 @@ CHIAKI_EXPORT void chiaki_gkcrypt_fini(ChiakiGKCrypt *gkcrypt)
 		chiaki_mutex_fini(&gkcrypt->key_buf_mutex);
 		chiaki_aligned_free(gkcrypt->key_buf);
 	}
+#ifndef CHIAKI_LIB_ENABLE_MBEDTLS
+	if(gkcrypt->keystream_ctx)
+	{
+		EVP_CIPHER_CTX_free(gkcrypt->keystream_ctx);
+		gkcrypt->keystream_ctx = NULL;
+	}
+	if(gkcrypt->gmac_ctx)
+	{
+		EVP_CIPHER_CTX_free(gkcrypt->gmac_ctx);
+		gkcrypt->gmac_ctx = NULL;
+	}
+#endif
 }
 
 static ChiakiErrorCode gkcrypt_gen_key_iv(ChiakiGKCrypt *gkcrypt, uint8_t index, const uint8_t *handshake_key, const uint8_t *ecdh_secret)
@@ -231,21 +263,21 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_gkcrypt_gen_key_stream(ChiakiGKCrypt *gkcry
 	}
 
 #else
-	EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+	/* Reuse the per-instance keystream context allocated at init. The
+	 * cipher type is the same for every call (AES-128-ECB), only the key
+	 * is constant per gkcrypt — set it on the cached context, and reset
+	 * cipher state with EVP_EncryptInit_ex on every call to clear any
+	 * residual state from the previous block. Saves a malloc + free per
+	 * keystream chunk, which is per-packet on the streaming hot path. */
+	EVP_CIPHER_CTX *ctx = (EVP_CIPHER_CTX *)gkcrypt->keystream_ctx;
 	if(!ctx)
 		return CHIAKI_ERR_UNKNOWN;
 
 	if(!EVP_EncryptInit_ex(ctx, EVP_aes_128_ecb(), NULL, gkcrypt->key_base, NULL))
-	{
-		EVP_CIPHER_CTX_free(ctx);
 		return CHIAKI_ERR_UNKNOWN;
-	}
 
 	if(!EVP_CIPHER_CTX_set_padding(ctx, 0))
-	{
-		EVP_CIPHER_CTX_free(ctx);
 		return CHIAKI_ERR_UNKNOWN;
-	}
 #endif
 	uint64_t counter_offset = (key_pos / CHIAKI_GKCRYPT_BLOCK_SIZE);
 
@@ -268,12 +300,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_gkcrypt_gen_key_stream(ChiakiGKCrypt *gkcry
 	int outl;
 	EVP_EncryptUpdate(ctx, buf, &outl, buf, (int)buf_size);
 	if(outl != buf_size)
-	{
-		EVP_CIPHER_CTX_free(ctx);
 		return CHIAKI_ERR_UNKNOWN;
-	}
-
-	EVP_CIPHER_CTX_free(ctx);
 #endif
 	return CHIAKI_ERR_SUCCESS;
 }
@@ -411,53 +438,53 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_gkcrypt_gmac(ChiakiGKCrypt *gkcrypt, uint64
 #else
 	ChiakiErrorCode ret = CHIAKI_ERR_SUCCESS;
 
-	EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+	/* Reuse the per-instance GMAC context allocated at init. The cipher
+	 * type (AES-128-GCM) and IV-length (16 bytes) are constant across
+	 * calls; only the key + IV change per call, so re-init those without
+	 * touching the cipher selection. Saves a malloc + free per packet on
+	 * the streaming hot path. */
+	EVP_CIPHER_CTX *ctx = (EVP_CIPHER_CTX *)gkcrypt->gmac_ctx;
 	if(!ctx)
-	{
-		ret = CHIAKI_ERR_MEMORY;
-		goto fail;
-	}
+		return CHIAKI_ERR_MEMORY;
 
 	if(!EVP_CipherInit_ex(ctx, EVP_aes_128_gcm(), NULL, NULL, NULL, 1))
 	{
 		ret = CHIAKI_ERR_UNKNOWN;
-		goto fail_cipher;
+		goto done;
 	}
 
 	if(!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN, CHIAKI_GKCRYPT_BLOCK_SIZE, NULL))
 	{
 		ret = CHIAKI_ERR_UNKNOWN;
-		goto fail_cipher;
+		goto done;
 	}
 
 	if(!EVP_CipherInit_ex(ctx, NULL, NULL, gmac_key, iv, 1))
 	{
 		ret = CHIAKI_ERR_UNKNOWN;
-		goto fail_cipher;
+		goto done;
 	}
 
 	int len;
 	if(!EVP_EncryptUpdate(ctx, NULL, &len, buf, (int)buf_size))
 	{
 		ret = CHIAKI_ERR_UNKNOWN;
-		goto fail_cipher;
+		goto done;
 	}
 
 	if(!EVP_EncryptFinal_ex(ctx, NULL, &len))
 	{
 		ret = CHIAKI_ERR_UNKNOWN;
-		goto fail_cipher;
+		goto done;
 	}
 
 	if(!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, CHIAKI_GKCRYPT_GMAC_SIZE, gmac_out))
 	{
 		ret = CHIAKI_ERR_UNKNOWN;
-		goto fail_cipher;
+		goto done;
 	}
 
-fail_cipher:
-	EVP_CIPHER_CTX_free(ctx);
-fail:
+done:
 	return ret;
 #endif
 }
