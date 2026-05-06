@@ -17,6 +17,7 @@ import SwiftUI
 /// - Bottom-right: version label.
 struct HostListView: View {
     @Environment(AppState.self) private var appState
+    @FocusState private var settingsGearFocused: Bool
 
     var body: some View {
         ZStack {
@@ -64,12 +65,16 @@ struct HostListView: View {
                 appState.showSettings()
             } label: {
                 Image(systemName: "gearshape.fill")
-                    .font(.system(size: 22, weight: .medium))
-                    .padding(.horizontal, Theme.space5)
-                    .padding(.vertical, Theme.space4)
+                    .font(.title2)
+                    .foregroundStyle(settingsGearFocused ? Theme.amber500
+                                                          : Theme.mist300)
+                    .padding(Theme.space3)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
+            .focused($settingsGearFocused)
+            .scaleEffect(settingsGearFocused ? 1.1 : 1.0)
+            .animation(.smooth(duration: 0.18), value: settingsGearFocused)
             .accessibilityLabel("Settings")
         }
         .padding(.horizontal, Theme.screenInset)
