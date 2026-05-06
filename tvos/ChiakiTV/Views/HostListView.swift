@@ -64,8 +64,9 @@ struct HostListView: View {
                 appState.showSettings()
             } label: {
                 Image(systemName: "gearshape.fill")
-                    .font(.title2)
-                    .frame(width: 56, height: 56)
+                    .font(.system(size: 24, weight: .medium))
+                    .frame(width: 72, height: 72)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.borderless)
             .accessibilityLabel("Settings")
