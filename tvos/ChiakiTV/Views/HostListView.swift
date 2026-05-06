@@ -2,25 +2,27 @@
 
 import SwiftUI
 
-/// The main host list. Mirrors [`gui/src/qml/MainView.qml`](../../../gui/src/qml/MainView.qml):
+/// The main host list, redesigned around the hero `HostCard` per
+/// [`docs/ui/redesign-plan.md §5.1`](../../docs/ui/redesign-plan.md).
 ///
-/// - 80-px top toolbar with [`×` quit] (left), [`+ Add Manual Host`,
-///   `⚙ Settings`] (right). The desktop's PSN/Steam buttons are
-///   intentionally omitted (see [`docs/ui/swift-ui-plan.md`](../../docs/ui/swift-ui-plan.md) §1).
-/// - Vertical list of `HostTile` rows, 180 px each.
-/// - Bottom-left: round discovery toggle (Phase 1 will bind to the bridge).
+/// Layout:
+///
+/// - Top toolbar (kept from prior design pending Step 10): `×` quit,
+///   `+ Add Manual Host`, `⚙ Settings`. Visually muted in the redesign so it
+///   doesn't compete with the hero.
+/// - Hero zone: one or more `HostCard`s vertically stacked when populated,
+///   centered in the canvas. Empty state falls back to `LogoPulse` plus a
+///   helpful caption (the "let's find your PS5" hint from the plan §5.1).
+/// - Bottom-left: discovery toggle (round wifi pill, kept).
 /// - Bottom-right: version label.
-/// - Centered watermark: `LogoPulse`.
 struct HostListView: View {
     @Environment(AppState.self) private var appState
 
     var body: some View {
         ZStack {
-            LogoPulse()
-
             VStack(spacing: 0) {
                 topToolbar
-                hostList
+                heroZone
             }
 
             bottomBar
@@ -69,23 +71,65 @@ struct HostListView: View {
         .background(Theme.surface.opacity(0.6))
     }
 
-    // MARK: - Host list
+    // MARK: - Hero zone
 
-    private var hostList: some View {
-        ScrollView {
-            LazyVStack(spacing: 4) {
-                ForEach(appState.hosts) { host in
-                    HostTile(host: host,
-                             onConnect: { connect(to: host) },
-                             onDelete: { delete(host) },
-                             onWakeUp: { wakeUp(host) },
-                             onUpdatePin: { appState.showConsolePin(hostId: host.id) })
+    @ViewBuilder
+    private var heroZone: some View {
+        if appState.hosts.isEmpty {
+            emptyState
+        } else {
+            ScrollView {
+                VStack(spacing: 24) {
+                    ForEach(appState.hosts) { host in
+                        HostCard(
+                            host: host,
+                            onConnect:    { connect(to: host) },
+                            onWake:       { wakeUp(host) },
+                            onUpdatePin:  { appState.showConsolePin(hostId: host.id) },
+                            onForget:     { delete(host) }
+                        )
+                    }
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 40)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 16)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Make the hero zone a focus region. Without this, D-pad Down
+            // from the toolbar's left-edge buttons (X, gear) jumps directly
+            // to the bottom-bar's left-edge wifi pill — the focus engine's
+            // spatial-alignment rule prefers vertical X-alignment over
+            // proximity. With `focusSection()`, the engine has to enter
+            // this zone first, landing on the Connect button.
+            .focusSection()
+        }
+    }
+
+    /// Empty-state guidance — replaces the always-on gamepad silhouette of
+    /// the prior design. Surfaces actionable next steps the user can take.
+    private var emptyState: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            LogoPulse()
+                .frame(width: 280, height: 280)
+
+            VStack(spacing: 10) {
+                Text("Let's find your PS5.")
+                    .font(Theme.font(.displayMed))
+                    .foregroundStyle(Theme.mist300)
+
+                Text("Make sure your PS5 is on the same Wi-Fi as the Apple TV " +
+                     "and Remote Play is enabled in System → Remote Play.")
+                    .font(Theme.font(.bodyLarge))
+                    .foregroundStyle(Theme.mist500)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 760)
+            }
+
+            Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 80)
     }
 
     // MARK: - Bottom bar (discovery toggle + version)
