@@ -35,7 +35,7 @@ struct SettingsView: View {
                 detailContent
                     .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            .padding(.horizontal, Theme.space7)
+            .padding(.horizontal, Theme.space8)
             .padding(.top, Theme.space6)
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .navigationTitle("Settings")
