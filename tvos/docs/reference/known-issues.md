@@ -22,7 +22,7 @@ Nothing yet — the scaffold builds clean.
 - `lib/src/takion.c`: introduce `TAKION_SO_RCVBUF = 4 MiB`, decoupled from the protocol-level `TAKION_A_RWND` advertisement. Use it at the two `SO_RCVBUF` setsockopt sites. The protocol-level a_rwnd announcement is unchanged so flow-control semantics are preserved.
 - `lib/src/takion.c`: at the start of `takion_thread_func`, on `__APPLE__` only, call `pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0)`. Matches the QoS class AVAudioEngine uses internally.
 
-**Should be upstreamed.** Both changes benefit any chiaki-ng client on Apple platforms (and arguably elsewhere — the 100 KiB buffer is conservative for any modern host). Track on next sync from upstream so the patches don't get clobbered.
+**Rebase note:** these patches live on our fork only (see [`../decisions.md#no-upstream-contributions--fork-only-never-propose-prs-back-to-streetpeachiaki-ng`](../decisions.md)). When we pull from `upstream` (`streetpea/chiaki-ng`) and `lib/src/takion.c` has moved, re-apply both hunks on the new base. The patches are small and self-contained, so a rebase rarely conflicts.
 
 **Reference**: see [`../reports/2026-05-06-11-05-run5.md`](../reports/2026-05-06-11-05-run5.md) for the full diagnosis.
 

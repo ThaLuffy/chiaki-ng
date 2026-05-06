@@ -174,3 +174,16 @@ ADR-style log of non-obvious choices for the chiaki-ng tvOS port. Each entry lis
 - The earlier code mapped both `buttonMenu` and `buttonOptions` to `CHIAKI_TV_BTN_OPTIONS`, leaving `CHIAKI_TV_BTN_SHARE` unreachable from any controller. The position-based mapping fixes that.
 
 **How to apply:** mapping lives in `ControllerService.makeState`; long-press detection lives in `handleOptionsPressChange`, set up alongside the Home handler in `wireExtendedGamepad`. The Share/Touchpad fallback requires the `GCXboxGamepad` profile to be exposed, which requires `GCSupportedGameControllers` absent / permissive in [`../ChiakiTV/Info.plist`](../ChiakiTV/Info.plist) (set 2026-05-06). Verify with the in-app diagnostic at **Settings → Controller**: pressing the View / Create button should light up `Button Options`, pressing Menu / Options should light up `Button Menu`, and on Xbox pressing Share should light up `Button Share`. The long-press → PS path doesn't show in the diagnostic (it's a synthesised software state), but the PS5 reaction is the test.
+
+## No upstream contributions — fork-only, never propose PRs back to streetpea/chiaki-ng
+
+**Decision:** any patches we make to upstream files (notably `lib/`) live exclusively on this fork (`ThaLuffy/chiaki-ng`). We do not plan, prepare, or propose pull requests back to `streetpea/chiaki-ng`. Claude must not suggest upstreaming anything, ever — not even as a "follow-up" or "consider it".
+
+**When:** 2026-05-06.
+
+**Why:**
+- This is a personal-use port for one living room. The maintenance overhead of an upstream PR (review cycles, style alignment, justifying changes for the broader chiaki-ng audience) outweighs the benefit when the only consumer is this fork.
+- The fork-and-rebase workflow handles drift just fine: when upstream `lib/src/takion.c` or others move, we rebase our patches on the new upstream. No coordination required.
+- Hard rule #1 in [`../CLAUDE.md`](../CLAUDE.md) ("wrap, don't patch") still applies in spirit — patches to `lib/` should remain rare, scoped, and well-commented — but the destination of those patches is *our fork's branch*, not an upstream PR.
+
+**How to apply:** when patching `lib/` (or any other directory we listed under "do not touch") becomes genuinely necessary, commit the patch on a tvos-port-adjacent branch in `origin` (the fork). Do not draft a PR description for upstream, do not suggest cherry-picking onto an `upstream-*` branch, do not say "worth upstreaming." Just land it on the fork.
