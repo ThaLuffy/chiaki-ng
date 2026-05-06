@@ -16,6 +16,7 @@
 
 #ifdef __APPLE__
 #include <TargetConditionals.h>
+#include <pthread/qos.h>
 #if TARGET_OS_OSX
 #include <CoreServices/CoreServices.h>
 #endif
@@ -39,6 +40,16 @@
 // VERY similar to SCTP, see RFC 4960
 
 #define TAKION_A_RWND 0x19000
+// Kernel UDP socket receive buffer (SO_RCVBUF). Decoupled from a_rwnd: the
+// latter is the protocol-level receive-window advertisement we send back to
+// the peer in data acks (lib/src/takion.c:692, init payload :832), which
+// chiaki-lib's send-side flow control respects. SO_RCVBUF is the kernel-side
+// scratch space used to absorb micro-bursts arriving faster than userspace
+// can drain them. On a Wi-Fi link to a 15 Mbps PS5 stream, the receive
+// thread can be preempted long enough for a 100 KiB buffer to overrun;
+// 4 MiB gives ~2 seconds of headroom and eliminates kernel-side drops as a
+// bottleneck. Real per-flow window is still bounded by a_rwnd.
+#define TAKION_SO_RCVBUF (4 * 1024 * 1024)
 #define TAKION_OUTBOUND_STREAMS 0x64
 #define TAKION_INBOUND_STREAMS 0x64
 
@@ -257,7 +268,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_connect(ChiakiTakion *takion, Chiaki
 			CHIAKI_LOGE(takion->log, "Takion had problem reading extra messages from socket using PSN Connection with error: " CHIAKI_SOCKET_ERROR_FMT, CHIAKI_SOCKET_ERROR_VALUE);
 			goto error_sock;
 		}
-		const int rcvbuf_val = takion->a_rwnd;
+		const int rcvbuf_val = TAKION_SO_RCVBUF;
 		int r = setsockopt(takion->sock, SOL_SOCKET, SO_RCVBUF, (const CHIAKI_SOCKET_BUF_TYPE)&rcvbuf_val, sizeof(rcvbuf_val));
 		if(r < 0)
 		{
@@ -345,7 +356,7 @@ CHIAKI_EXPORT ChiakiErrorCode chiaki_takion_connect(ChiakiTakion *takion, Chiaki
 			ret = CHIAKI_ERR_NETWORK;
 			goto error_pipe;
 		}
-		const int rcvbuf_val = takion->a_rwnd;
+		const int rcvbuf_val = TAKION_SO_RCVBUF;
 		int r = setsockopt(takion->sock, SOL_SOCKET, SO_RCVBUF, (const CHIAKI_SOCKET_BUF_TYPE)&rcvbuf_val, sizeof(rcvbuf_val));
 		if(r < 0)
 		{
@@ -1062,6 +1073,16 @@ static void *takion_thread_func(void *user)
 {
 	ChiakiTakion *takion = user;
 	chiaki_thread_set_affinity(CHIAKI_THREAD_NAME_TAKION);
+
+#ifdef __APPLE__
+	// Elevate this thread to USER_INTERACTIVE on Apple platforms. Default
+	// inherited QoS gets the receive thread preempted under load (e.g. on
+	// tvOS while the renderer or audio thread is active), which causes the
+	// kernel UDP socket buffer to overrun during burst arrivals at ≥15 Mbps.
+	// USER_INTERACTIVE matches what AVAudioEngine uses internally and keeps
+	// the recv() loop draining ahead of inbound bursts on Wi-Fi.
+	pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
+#endif
 
 	takion->video_queue_initialized = false;
 	takion->video_queue_head_wait_start_us = 0;
