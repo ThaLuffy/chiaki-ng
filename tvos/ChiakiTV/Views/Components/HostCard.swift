@@ -50,6 +50,15 @@ struct HostCard: View {
         .shadow(color: rimColor.opacity(cardFocused ? 0.45 : 0.18),
                 radius: cardFocused ? 40 : 22, x: 0, y: 0)
         .focusSection()
+        // Default focus: CONNECT, every time the card materialises. Per
+        // docs/ui/redesign-plan.md §5.1 ("Initial focus: the CONNECT button
+        // on the host card. Auto-focus, every launch."). Without this, the
+        // focus engine lands on whatever happens to be spatially closest to
+        // the previous focus target — usually the bottom-left wifi pill on
+        // first launch. The user-visible result is a Connect-press
+        // requiring at least one navigation D-pad press, which is the
+        // single most-frequent action in the app.
+        .defaultFocus($focused, .connect)
         .animation(Theme.focusSpring, value: cardFocused)
     }
 

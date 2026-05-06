@@ -31,23 +31,23 @@ struct HostListView: View {
     }
 
     // MARK: - Top toolbar
+    //
+    // The X "exit app" button is intentionally absent — tvOS apps exit via
+    // the system TV button, not via in-app affordances (HIG, see audit
+    // issue H7). The wordmark + scan-line live on the left; secondary
+    // actions (Add Manual Host, Settings) live on the right.
 
     private var topToolbar: some View {
         HStack(spacing: 0) {
-            Button {
-                appState.showConfirm(
-                    title: "Quit ChiakiTV?",
-                    message: "Are you sure you want to quit?",
-                    onConfirm: { exit(0) }
-                )
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: Theme.bigCloseFontSize, weight: .light))
-                    .foregroundStyle(Theme.primaryText)
-                    .frame(width: 100, height: Theme.toolbarHeight)
-                    .contentShape(Rectangle())
+            VStack(alignment: .leading, spacing: 4) {
+                Text("ChiakiTV")
+                    .font(Theme.font(.titleLarge).weight(.semibold))
+                    .foregroundStyle(Theme.white50)
+                    .tracking(0.5)
+
+                discoveryStatusLine
             }
-            .buttonStyle(.plain)
+            .padding(.leading, 60)
 
             Spacer()
 
@@ -60,15 +60,31 @@ struct HostListView: View {
                 appState.showSettings()
             } label: {
                 Image(systemName: "gearshape.fill")
-                    .font(.system(size: Theme.largeIconSize - 8))
-                    .foregroundStyle(Theme.primaryText)
-                    .frame(width: 100, height: Theme.toolbarHeight)
+                    .font(.system(size: Theme.largeIconSize - 12))
+                    .foregroundStyle(Theme.mist300)
+                    .frame(width: 80, height: 64)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .padding(.trailing, 40)
         }
         .frame(height: Theme.toolbarHeight)
-        .background(Theme.surface.opacity(0.6))
+    }
+
+    /// Tiny inline indicator next to the wordmark — replaces the bottom-bar
+    /// wifi pill's role as "discovery active" telltale.
+    private var discoveryStatusLine: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(appState.discoveryEnabled ? Theme.amber500 : Theme.mist500)
+                .frame(width: 6, height: 6)
+
+            Text(appState.discoveryEnabled
+                 ? "Listening for consoles on this network"
+                 : "Discovery paused")
+                .font(Theme.font(.bodySmall))
+                .foregroundStyle(Theme.mist500)
+        }
     }
 
     // MARK: - Hero zone
@@ -132,37 +148,29 @@ struct HostListView: View {
         .padding(.horizontal, 80)
     }
 
-    // MARK: - Bottom bar (discovery toggle + version)
+    // MARK: - Bottom bar
+    //
+    // The previous bottom bar had a focusable "discovery toggle" wifi pill at
+    // the left edge. It pulled launch focus away from the hero CONNECT
+    // button (the focus engine prefers vertical x-alignment over proximity).
+    // The discovery indicator now lives in the toolbar status line; the
+    // toggle is dropped because pausing discovery is a near-zero-frequency
+    // action. The version label is preserved as a low-emphasis bottom-right
+    // anchor.
 
     private var bottomBar: some View {
         VStack {
             Spacer()
-            HStack(alignment: .bottom) {
-                Button {
-                    appState.discoveryEnabled.toggle()
-                } label: {
-                    Image(systemName: appState.discoveryEnabled
-                          ? "wifi" : "wifi.slash")
-                        .font(.system(size: Theme.largeIconSize - 12))
-                        .foregroundStyle(Theme.primaryText)
-                        .padding(20)
-                        .background(
-                            Circle().fill(appState.discoveryEnabled
-                                          ? Theme.accent
-                                          : Theme.surface)
-                        )
-                }
-                .buttonStyle(.plain)
-                .padding(20)
-
+            HStack {
                 Spacer()
-
                 Text(versionLabel)
-                    .font(.system(size: Theme.dialogHeaderFontSize))
-                    .foregroundStyle(Theme.tertiaryText)
-                    .padding(20)
+                    .font(Theme.font(.bodySmall))
+                    .foregroundStyle(Theme.mist500.opacity(0.6))
+                    .padding(.trailing, 32)
+                    .padding(.bottom, 24)
             }
         }
+        .allowsHitTesting(false)  // keep it out of the focus tree entirely
     }
 
     private var versionLabel: String {
