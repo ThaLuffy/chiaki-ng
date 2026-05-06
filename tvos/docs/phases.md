@@ -52,6 +52,13 @@ Phase 1 success criteria: 4K HEVC video + stereo Opus audio + DualSense control 
 - DualSense haptics + adaptive triggers via `GCDualSenseGamepad` (deferred).
 - LAN discovery surfaced in the host list (currently manual-host-entry only) (deferred).
 - In-stream menu overlay (long-press of the PS button to open) — already wired in Phase 1 (`appState.streamMenuOpen` + `StreamMenuOverlay`).
+- ~~**Latency-first native-alternatives Phase A** (six tvOS-side optimizations).~~ ✅ implemented 2026-05-07. See [`optimization/native-alternatives-latency-first.md`](optimization/native-alternatives-latency-first.md) for per-item file:line citations and verdicts. Summary:
+  - OpenSSL `libcrypto.a` rebuilt with ARMv8 AES asm (`_aes_v8_*` symbols verified).
+  - Annex-B → AVCC walk relocated into [`ChiakiBridgeC/src/chiaki_bridge_video.c`](../ChiakiBridgeC/src/chiaki_bridge_video.c) — eliminates per-frame `Data` allocation on the streaming hot path.
+  - `kCMSampleAttachmentKey_DisplayImmediately` set on every sample buffer.
+  - Pre-warm path confirmed (parameter-set delivery builds VT session before any slice arrives) and AVCC malloc skipped on parameter-set-only deliveries.
+  - `audioBufferMs` default lowered from 80 to 30.
+  - Renderer migrated to raw `CAMetalLayer` + `CAMetalDisplayLink` (tvOS 17+) for `targetPresentationTimestamp`-aligned presents. Hardware verify required.
 
 ## Out of scope (explicitly dropped — not deferred)
 

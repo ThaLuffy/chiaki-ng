@@ -369,12 +369,12 @@ Mapping each opportunity above:
 
 Phase A — wins that need no protocol risk and no lib/ touch (do these first):
 
-1. **OpenSSL build with hardware AES** (BoringSSL drop-in or fix `enable-asm`). Single biggest steady-state win.
-2. **Annex-B → AVCC walk in `ChiakiBridgeC`**. Zero per-frame allocation on the streaming hot path.
-3. **`kCMSampleAttachmentKey_DisplayImmediately = true`** in the sample buffer. One-line change.
-4. **VT session pre-warm** in the STREAMINFO callback path. First-frame UX win.
-5. **Drop `audioBufferMs` default to 30 ms.** One-line change.
-6. **Migrate renderer to raw `CAMetalLayer` + `CAMetalDisplayLink`.** Tightens vsync alignment.
+1. ~~**OpenSSL build with hardware AES**~~ ✅ implemented 2026-05-07 — `tvos/scripts/build-deps-tvos.sh` Configure flags now include ARMv8 asm (the `no-asm` flag was dropped). Verified: `_aes_v8_*` symbols (`_aes_v8_set_encrypt_key`, `_aes_v8_ecb_encrypt`, etc.) are now present in `Vendors/prefix/{appletvos,appletvsimulator}/lib/libcrypto.a`. The previous `no-asm` rationale (asm calls into routines invalid on tvOS) no longer applies on current SDKs. Hardware verify required for end-to-end speedup.
+2. ~~**Annex-B → AVCC walk in `ChiakiBridgeC`**~~ ✅ implemented 2026-05-07 — new `ChiakiBridgeC/{include/ChiakiBridgeC/chiaki_bridge_video.h, src/chiaki_bridge_video.c}` exposes `chiaki_tv_walk_annex_b`. `VideoDecoder.swift` no longer allocates a `Data` per video sample; the C walker writes AVCC into a fresh malloc'd buffer the Swift side hands directly to `CMBlockBufferCreateWithMemoryBlock(kCFAllocatorMalloc)`. Parameter-set-only deliveries skip the AVCC build entirely.
+3. ~~**`kCMSampleAttachmentKey_DisplayImmediately = true`**~~ ✅ implemented 2026-05-07 — set on the `CMSampleBuffer` attachments dict in `VideoDecoder.swift` before `VTDecompressionSessionDecodeFrame`.
+4. ~~**VT session pre-warm**~~ ✅ already in place (the previous audit's "lazy on first frame" claim was wrong — `refreshFormatDescription` runs on parameter-set delivery before the `hasSlice` check). Refinement implemented 2026-05-07: skip the unused AVCC malloc on parameter-set-only deliveries.
+5. ~~**Drop `audioBufferMs` default to 30 ms**~~ ✅ implemented 2026-05-07 — `AppSettings.swift` default now 30; test anchors updated.
+6. ~~**Migrate renderer to raw `CAMetalLayer` + `CAMetalDisplayLink`**~~ ✅ implemented 2026-05-07 — `MetalRenderer.swift` no longer uses `MTKView`; new `ChiakiMetalView` (UIView subclass with `layerClass = CAMetalLayer`) hosts the layer; `CAMetalDisplayLink` (tvOS 17+) drives presents and supplies `targetPresentationTimestamp` to `commandBuffer.present(_:atTime:)`.
 
 Phase B — upstream contributions (in priority order):
 
