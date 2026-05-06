@@ -29,7 +29,7 @@
 
 **Conclusion:** the four swaps in **bold** above (hardware AES, EVP context reuse, in-C NAL walk, CAMetalDisplayLink alignment) account for essentially all the optimisable latency. Everything else is either physics, already optimal, or a fraction of a millisecond.
 
-A fifth opportunity is on the **input path**, not the video path: chiaki's `feedbacksender.c` enforces a **minimum 8 ms** between controller-state packets ([`feedbacksender.c:8` `FEEDBACK_STATE_TIMEOUT_MIN_MS 8`](../../../lib/src/feedbacksender.c)). Our bridge calls `chiaki_session_set_controller_state` immediately on every value change — chiaki throttles to 8 ms. Patching this constant down (or making it configurable, upstream) is the cheapest controller-latency win available.
+**Audit correction (2026-05-07):** the original draft listed a fifth opportunity claiming chiaki's `feedbacksender.c` enforces a **minimum 8 ms** between controller-state packets via `FEEDBACK_STATE_TIMEOUT_MIN_MS`. On closer inspection the constant is **declared but never enforced** ([`feedbacksender.c:8`](../../../lib/src/feedbacksender.c) defines it; [`feedbacksender.c:314`](../../../lib/src/feedbacksender.c) carries a literal `// TODO: FEEDBACK_STATE_TIMEOUT_MIN_MS` comment). chiaki actually sends feedback packets sub-millisecond after a controller-state change via `chiaki_cond_signal`-based wake-up. **There is no input-latency floor to remove.** Phase B item 9 (B.2) is therefore withdrawn.
 
 ## Methodology
 
@@ -184,12 +184,12 @@ Hot-path = called per UDP packet, per video frame, per audio frame, or per contr
 
 #### `lib/src/feedbacksender.c` (354 lines) + `feedback.c` (208 lines) + `controller.c` (165 lines)
 
-**Verification — input-latency floor:**
-- Source: [`feedbacksender.c:8` `#define FEEDBACK_STATE_TIMEOUT_MIN_MS 8`](../../../lib/src/feedbacksender.c).
-- Data: chiaki's feedback sender thread (`feedback_sender_thread_func`) wakes when the controller-state-changed flag is set, but enforces **minimum 8 ms between consecutive controller-state packets**. Our [`ControllerService.swift`](../../ChiakiTV/Services/Controller/ControllerService.swift) calls `chiaki_tv_session_set_controller_state` immediately on every `valueChangedHandler` callback, but chiaki throttles.
-- Conclusion: **input latency floor of 8 ms** baked into chiaki, regardless of how aggressively our bridge feeds it.
+**Verification — no actual input-latency floor (audit correction 2026-05-07):**
+- Source: [`feedbacksender.c:8` `#define FEEDBACK_STATE_TIMEOUT_MIN_MS 8`](../../../lib/src/feedbacksender.c) — the constant is declared but only one other reference exists in the file: [`feedbacksender.c:314`](../../../lib/src/feedbacksender.c) which is a `// TODO: FEEDBACK_STATE_TIMEOUT_MIN_MS` comment, not enforcement code.
+- Data: the feedback-sender thread blocks in `chiaki_cond_timedwait_pred` ([`feedbacksender.c:293`](../../../lib/src/feedbacksender.c)) until either the predicate flips (controller state changed) or the MAX timeout (200 ms) elapses. On state change it wakes immediately via `chiaki_cond_signal` and emits the packet — sub-millisecond latency.
+- Conclusion: **no input-latency floor exists.** The MIN constant is dead code awaiting an upstream TODO that was never implemented.
 
-**Verdict:** **WARM — upstream PR for configurability.** Drop to 4 ms for wired-LAN scenarios (or make it a session-config field in `ChiakiConnectInfo`). Personal-use fork-patch is the fast path; upstream PR is the right path.
+**Verdict:** **HOT — keep.** No optimisation available without first implementing the upstream TODO; the path is already as low-latency as the protocol allows.
 
 #### `lib/src/orientation.c` (227 lines) — Madgwick filter for IMU → quaternion
 
@@ -321,14 +321,12 @@ These are hot wins entirely on our side of the bridge, so they don't engage hard
 
 In rough priority by impact:
 
-1. **`EVP_CIPHER_CTX` reuse in `gkcrypt.c`** — eliminate per-packet malloc on the hottest path. Single-file change. Generic upstream win.
-2. **`FEEDBACK_STATE_TIMEOUT_MIN_MS` configurability** — input-latency floor for low-latency LAN setups. Add a field to `ChiakiConnectInfo` that defaults to 8 (preserving today's behaviour).
-3. **`TAKION_REORDER_QUEUE_SIZE_EXP` configurability** — same idea, exposed as a connect-info field.
-4. **`CONGESTION_CONTROL_INTERVAL_MS` configurability** — sub-microsecond gain, but the flag plumbing is the same.
-5. **CommonCrypto / CryptoKit crypto backend** alongside OpenSSL/mbedTLS — Apple-platform contributors get hardware AES even if their OpenSSL is built `no-asm`.
-6. **Lock-free `packetstats.c`** — atomic counters in place of mutex.
-
-If the OpenSSL `no-asm` issue is hard to fix cleanly from our side (item #5 in the previous audit), upstream contribution #5 here is the principled escape hatch.
+1. ~~**`EVP_CIPHER_CTX` reuse in `gkcrypt.c`**~~ ✅ implemented 2026-05-07. Per-instance contexts allocated at `chiaki_gkcrypt_init`, freed at `chiaki_gkcrypt_fini`, reused via `EVP_*Init_ex` on every call. Eliminates per-packet malloc on the streaming hot path. Single-file change in [`gkcrypt.c`](../../../lib/src/gkcrypt.c) plus two `void *` fields in [`gkcrypt.h`](../../../lib/include/chiaki/gkcrypt.h). Generic upstream win.
+2. ~~**`TAKION_REORDER_QUEUE_SIZE_EXP` configurability**~~ ✅ implemented 2026-05-07. New field on `ChiakiConnectInfo` ([`session.h`](../../../lib/include/chiaki/session.h)) and `ChiakiTakionConnectInfo` ([`takion.h`](../../../lib/include/chiaki/takion.h)); `0` preserves the historical default (4 → 16 entries). The tvOS bridge surfaces it as `chiaki_tv_session_config_t.takion_reorder_queue_size_exp`; our `StreamSession` sets `2` (4 entries) for wired-LAN.
+3. ~~**`FEEDBACK_STATE_TIMEOUT_MIN_MS` configurability**~~ — withdrawn (audit correction). The constant exists but is never enforced; no latency floor to remove.
+4. **`CONGESTION_CONTROL_INTERVAL_MS` configurability** — sub-microsecond gain, mostly cosmetic. Skipped.
+5. **CommonCrypto / CryptoKit crypto backend** alongside OpenSSL/mbedTLS — not needed since `Phase A.1` (asm rebuild) achieves the same speedup. Skipped.
+6. **Lock-free `packetstats.c`** — atomic counters in place of mutex. Sub-microsecond gain. Skipped.
 
 ## What hard rule #1 means for this audit
 
@@ -339,18 +337,18 @@ Mapping each opportunity above:
 | Opportunity | tvOS-side? | Touches `lib/`? | Path |
 |---|---|---|---|
 | OpenSSL `enable-asm` / BoringSSL | ✅ | No (build-script only) | Do it on our side. |
-| `EVP_CIPHER_CTX` reuse | ❌ | Yes (`gkcrypt.c`) | **Upstream PR** (clearly valuable to all chiaki-ng users). |
-| Annex-B walk in C bridge | ✅ | No (our `ChiakiBridgeC/`) | Do it on our side. |
-| `CAMetalDisplayLink` migration | ✅ | No (our renderer) | Do it on our side. |
-| `DisplayImmediately` attachment | ✅ | No (our decoder) | Do it on our side. |
-| VT session pre-warm | ✅ | No | Do it on our side. |
-| `audioBufferMs` 30 ms | ✅ | No | Do it on our side. |
-| `FEEDBACK_STATE_TIMEOUT_MIN_MS` 4 ms | ❌ | Yes (`feedbacksender.c`) | **Upstream PR** (configurable field on `ChiakiConnectInfo`). |
-| `TAKION_REORDER_QUEUE_SIZE_EXP` 2 | ❌ | Yes (`takion.c`) | **Upstream PR** (configurable field). |
-| Lock-free `packetstats.c` | ❌ | Yes | **Upstream PR**. |
-| CommonCrypto crypto backend | ❌ | Yes | **Upstream PR**. |
+| `EVP_CIPHER_CTX` reuse | ❌ | Yes (`gkcrypt.c`) | **Upstream-PR-ready, landed in this branch 2026-05-07.** |
+| Annex-B walk in C bridge | ✅ | No (our `ChiakiBridgeC/`) | Done. |
+| `CAMetalDisplayLink` migration | ✅ | No (our renderer) | Done. |
+| `DisplayImmediately` attachment | ✅ | No (our decoder) | Done. |
+| VT session pre-warm | ✅ | No | Already in place; comment refined. |
+| `audioBufferMs` 30 ms | ✅ | No | Done. |
+| `FEEDBACK_STATE_TIMEOUT_MIN_MS` reduction | ❌ | n/a | **Withdrawn** — constant is never enforced (audit correction). |
+| `TAKION_REORDER_QUEUE_SIZE_EXP` 2 | ❌ | Yes (`takion.c`, `session.h`, `streamconnection.c`) | **Upstream-PR-ready, landed in this branch 2026-05-07.** |
+| Lock-free `packetstats.c` | ❌ | Yes | Skipped — sub-microsecond. |
+| CommonCrypto crypto backend | ❌ | Yes | Skipped — Phase A.1 (asm rebuild) covers it. |
 
-**Five tvOS-side wins** + **five upstream-PR wins**. None of this asks us to fork-patch `lib/` while staying on the tvOS port — every chiaki-touching change is upstream-contributable.
+**Six tvOS-side wins** + **two upstream-contributable patches** carried in this branch. The remaining items either landed on our side (Phase A) or were honestly withdrawn after closer reading of the upstream code.
 
 ## Considered and dropped (even with the latency-first lens)
 
@@ -378,9 +376,10 @@ Phase A — wins that need no protocol risk and no lib/ touch (do these first):
 
 Phase B — upstream contributions (in priority order):
 
-7. **`EVP_CIPHER_CTX` reuse PR** to `gkcrypt.c`.
-8. **`FEEDBACK_STATE_TIMEOUT_MIN_MS` + `TAKION_REORDER_QUEUE_SIZE_EXP` configurability PR**.
-9. **CommonCrypto crypto backend PR** (only if (1) is intractable).
+7. ~~**`EVP_CIPHER_CTX` reuse PR** to `gkcrypt.c`.~~ ✅ implemented 2026-05-07. `ChiakiGKCrypt` gains two `void *` context fields (`keystream_ctx`, `gmac_ctx`) allocated once in `chiaki_gkcrypt_init` and freed in `chiaki_gkcrypt_fini`. The per-packet `EVP_CIPHER_CTX_new`/`_free` calls in `chiaki_gkcrypt_gen_key_stream` ([`gkcrypt.c:266`](../../../lib/src/gkcrypt.c)) and `chiaki_gkcrypt_gmac` ([`gkcrypt.c:441`](../../../lib/src/gkcrypt.c)) are gone — the cached contexts are reused via `EVP_*Init_ex`. mbedTLS path unchanged (its contexts are stack-allocated).
+8. ~~**`TAKION_REORDER_QUEUE_SIZE_EXP` configurability PR**.~~ ✅ implemented 2026-05-07. Added `takion_reorder_queue_size_exp` field on `ChiakiConnectInfo` ([`session.h`](../../../lib/include/chiaki/session.h)), threaded through to `ChiakiTakionConnectInfo` ([`takion.h`](../../../lib/include/chiaki/takion.h)), captured on `ChiakiTakion`, and consumed in [`takion.c:1095`](../../../lib/src/takion.c) where the reorder queue is initialized. 0 means "use historical default of 4". Bridge field `takion_reorder_queue_size_exp` on `chiaki_tv_session_config_t`; `StreamSession.connect(...)` passes 2 (4 entries) for our wired-LAN use case.
+9. ~~**`FEEDBACK_STATE_TIMEOUT_MIN_MS` configurability**~~ — **withdrawn**. The audit's "8 ms input-latency floor" claim was wrong: the constant is declared at [`feedbacksender.c:8`](../../../lib/src/feedbacksender.c) but **never enforced** (the comment at line 314 reads `// TODO: FEEDBACK_STATE_TIMEOUT_MIN_MS`). chiaki actually sends feedback packets sub-millisecond after a controller-state change via `chiaki_cond_signal`-based wake-up. No latency win available here without first implementing the upstream TODO. No-op for our latency goal.
+10. **CommonCrypto crypto backend PR** (only if (1) is intractable) — not needed; (1) achieves the same speedup via the build-script change.
 
 Phase C — measurement (the most important step):
 

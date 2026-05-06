@@ -59,6 +59,10 @@ Phase 1 success criteria: 4K HEVC video + stereo Opus audio + DualSense control 
   - Pre-warm path confirmed (parameter-set delivery builds VT session before any slice arrives) and AVCC malloc skipped on parameter-set-only deliveries.
   - `audioBufferMs` default lowered from 80 to 30.
   - Renderer migrated to raw `CAMetalLayer` + `CAMetalDisplayLink` (tvOS 17+) for `targetPresentationTimestamp`-aligned presents. Hardware verify required.
+- ~~**Latency-first native-alternatives Phase B** (upstream-contributable patches).~~ ✅ implemented 2026-05-07. Carried in this branch on the `tvos-port` line; each is structured to be upstream-PR-ready.
+  - **`EVP_CIPHER_CTX` reuse in `gkcrypt.c`**: per-instance contexts allocated once at `chiaki_gkcrypt_init`, freed at `chiaki_gkcrypt_fini`, reused across every encrypt + GMAC call. Eliminates per-packet malloc on the streaming hot path. Files: [`lib/include/chiaki/gkcrypt.h`](../../lib/include/chiaki/gkcrypt.h), [`lib/src/gkcrypt.c`](../../lib/src/gkcrypt.c).
+  - **`TAKION_REORDER_QUEUE_SIZE_EXP` configurability**: new field on `ChiakiConnectInfo` (default 0 = preserve historical behaviour); threaded through `ChiakiTakionConnectInfo` and `ChiakiTakion` to the call site at [`takion.c:1095`](../../lib/src/takion.c). Bridge-level field on `chiaki_tv_session_config_t` ([`ChiakiBridgeC/include/ChiakiBridgeC/chiaki_bridge_session.h`](../ChiakiBridgeC/include/ChiakiBridgeC/chiaki_bridge_session.h)); `StreamSession.connect(...)` sets `2` (4 entries) for our wired-LAN target.
+  - **`FEEDBACK_STATE_TIMEOUT_MIN_MS` reduction**: withdrawn after audit correction — the constant is declared but never enforced ([`feedbacksender.c:8` + `:314 // TODO`](../../lib/src/feedbacksender.c)); chiaki sends feedback packets sub-millisecond after a controller-state change. There is no input-latency floor to remove.
 
 ## Out of scope (explicitly dropped — not deferred)
 
