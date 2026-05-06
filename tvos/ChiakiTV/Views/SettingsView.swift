@@ -495,70 +495,129 @@ private struct ControllerDiagnosticTab: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Controller Diagnostic")
-                    .font(.system(size: Theme.dialogTitleFontSize, weight: .bold))
-                    .foregroundStyle(Theme.primaryText)
-
-                Text("Live snapshot of every connected GCController. Press a button to verify mapping; the dot lights green when the framework reports it pressed.")
-                    .font(.system(size: Theme.dialogHeaderFontSize))
-                    .foregroundStyle(Theme.tertiaryText)
-
+            VStack(alignment: .leading, spacing: 24) {
                 if snapshot.controllers.isEmpty {
-                    Text("No controllers connected.")
-                        .font(.system(size: Theme.baseFontSize))
-                        .foregroundStyle(Theme.secondaryText)
-                        .padding(.top, 12)
+                    emptyState
                 } else {
                     ForEach(0..<snapshot.controllers.count, id: \.self) { idx in
                         controllerCard(snapshot.controllers[idx])
                     }
                 }
             }
-            .padding(40)
+            .padding(.vertical, 24)
+            .padding(.horizontal, 12)
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .onAppear { startPolling() }
         .onDisappear { stopPolling() }
     }
 
+    private var emptyState: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "gamecontroller")
+                .font(.system(size: 80, weight: .light))
+                .foregroundStyle(Theme.mist500)
+            Text("No controllers connected.")
+                .font(Theme.font(.titleMed))
+                .foregroundStyle(Theme.mist300)
+            Text("Pair a DualSense or MFi controller in tvOS Settings → Remotes & Devices.")
+                .font(Theme.font(.bodyMed))
+                .foregroundStyle(Theme.mist500)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 80)
+    }
+
     @ViewBuilder
     private func controllerCard(_ c: ControllerSnapshot.Entry) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(c.vendorName)
-                .font(.system(size: Theme.dialogTitleFontSize, weight: .semibold))
-                .foregroundStyle(Theme.primaryText)
-            Text("Profile: \(c.profileClass)")
-                .font(.system(size: Theme.dialogHeaderFontSize))
-                .foregroundStyle(Theme.secondaryText)
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(c.hasHome ? Color.green : Theme.errorRed)
-                    .frame(width: 14, height: 14)
-                Text(c.hasHome ? "Home button exposed" : "Home button NOT exposed")
-                    .font(.system(size: Theme.baseFontSize))
-                    .foregroundStyle(Theme.primaryText)
-            }
-            Divider().background(Theme.tertiaryText).padding(.vertical, 4)
-            Text("Buttons (\(c.buttons.count))")
-                .font(.system(size: Theme.dialogHeaderFontSize, weight: .semibold))
-                .foregroundStyle(Theme.secondaryText)
-            ForEach(0..<c.buttons.count, id: \.self) { i in
-                let b = c.buttons[i]
+        VStack(alignment: .leading, spacing: 18) {
+            // Header — vendor name big, profile + home-status as adjacent chips.
+            VStack(alignment: .leading, spacing: 8) {
+                Text(c.vendorName)
+                    .font(Theme.font(.displaySmall))
+                    .foregroundStyle(Theme.white50)
                 HStack(spacing: 10) {
-                    Circle()
-                        .fill(b.pressed ? Color.green : Color.white.opacity(0.18))
-                        .frame(width: 12, height: 12)
-                    Text(b.name)
-                        .font(.system(size: Theme.baseFontSize))
-                        .foregroundStyle(b.pressed ? Theme.primaryText : Theme.secondaryText)
+                    statusChip(label: c.profileClass,
+                               color: Theme.psBlue, glyph: "rectangle.connected.to.line.below")
+                    statusChip(label: c.hasHome ? "HOME EXPOSED" : "HOME NOT EXPOSED",
+                               color: c.hasHome ? Theme.green500 : Theme.rose500,
+                               glyph: c.hasHome ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                }
+            }
+
+            // Button cluster grid.
+            buttonClusters(for: c)
+        }
+        .padding(28)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                .fill(Theme.ink800)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                .stroke(Theme.ink600, lineWidth: 1)
+        )
+    }
+
+    /// Renders the button list grouped by physical cluster. Resolves audit
+    /// issue Co1 (alphabetical sort scattered logically-grouped inputs).
+    private func buttonClusters(for c: ControllerSnapshot.Entry) -> some View {
+        let groups = ControllerSnapshot.cluster(buttons: c.buttons)
+        return VStack(alignment: .leading, spacing: 16) {
+            ForEach(groups) { group in
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(group.title.uppercased())
+                        .font(Theme.font(.caption))
+                        .foregroundStyle(Theme.mist500)
+                        .tracking(1.4)
+
+                    LazyVGrid(columns: [
+                        GridItem(.adaptive(minimum: 220, maximum: 320), spacing: 6)
+                    ], alignment: .leading, spacing: 6) {
+                        ForEach(0..<group.buttons.count, id: \.self) { i in
+                            buttonRow(group.buttons[i])
+                        }
+                    }
                 }
             }
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.surface)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func buttonRow(_ b: ControllerSnapshot.Button) -> some View {
+        HStack(spacing: 10) {
+            Circle()
+                .fill(b.pressed ? Theme.green500 : Theme.ink600)
+                .frame(width: 10, height: 10)
+                .shadow(color: b.pressed ? Theme.green500.opacity(0.6) : .clear,
+                        radius: 5)
+            Text(b.name)
+                .font(Theme.font(.bodyMed))
+                .foregroundStyle(b.pressed ? Theme.white50 : Theme.mist500)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+    }
+
+    private func statusChip(label: String, color: Color, glyph: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: glyph)
+                .font(.system(size: 14, weight: .semibold))
+            Text(label)
+                .font(Theme.font(.monoSmall))
+                .tracking(1.0)
+        }
+        .foregroundStyle(color)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(
+            Capsule().fill(color.opacity(0.12))
+        )
+        .overlay(
+            Capsule().stroke(color.opacity(0.5), lineWidth: 1)
+        )
     }
 
     private func startPolling() {
@@ -592,6 +651,15 @@ private struct ControllerSnapshot {
         let pressed: Bool
     }
 
+    /// A logically-grouped subset of inputs. Used by the redesigned
+    /// diagnostic to render thumb cluster / d-pad / etc as separate groups
+    /// instead of one alphabetical wall of text.
+    struct Group: Identifiable {
+        let id = UUID()
+        let title: String
+        let buttons: [Button]
+    }
+
     static func capture() -> ControllerSnapshot {
         let entries = GCController.controllers().map { c -> Entry in
             let profile = c.physicalInputProfile
@@ -609,6 +677,45 @@ private struct ControllerSnapshot {
             )
         }
         return ControllerSnapshot(controllers: entries)
+    }
+
+    /// Bucket the alphabetical button list by physical cluster. Anything
+    /// that doesn't match a known cluster lands in "Other" so the grouping
+    /// stays loss-less even when GameController surfaces a vendor-specific
+    /// input we didn't anticipate.
+    static func cluster(buttons: [Button]) -> [Group] {
+        // Match against substrings of GCController's input identifiers
+        // (GCInputButtonA / GCInputDirectionPadUp / etc), which are
+        // mostly stable across MFi profiles.
+        let buckets: [(title: String, contains: [String])] = [
+            ("Face buttons",  ["Button A", "Button B", "Button X", "Button Y"]),
+            ("D-pad",         ["Direction Pad"]),
+            ("Shoulders",     ["Left Shoulder", "Right Shoulder",
+                               "Left Trigger",  "Right Trigger"]),
+            ("Left stick",    ["Left Thumbstick"]),
+            ("Right stick",   ["Right Thumbstick"]),
+            ("System",        ["Button Menu", "Button Options", "Button Home",
+                               "Button Share", "Touchpad"])
+        ]
+
+        var assigned = Set<String>()
+        var groups: [Group] = []
+        for bucket in buckets {
+            let matches = buttons.filter { btn in
+                bucket.contains.contains { btn.name.contains($0) }
+            }
+            if !matches.isEmpty {
+                groups.append(Group(title: bucket.title, buttons: matches))
+                matches.forEach { assigned.insert($0.name) }
+            }
+        }
+
+        // Anything left over.
+        let leftovers = buttons.filter { !assigned.contains($0.name) }
+        if !leftovers.isEmpty {
+            groups.append(Group(title: "Other", buttons: leftovers))
+        }
+        return groups
     }
 }
 
