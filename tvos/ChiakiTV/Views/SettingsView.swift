@@ -407,14 +407,21 @@ private struct ControllerDiagnosticTab: View {
                     Text("Pair a DualSense or MFi controller in tvOS Settings → Remotes & Devices.")
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if diagnosticActive {
-                diagnosticGrid
             } else {
                 idleView
             }
         }
         .onAppear { startPolling() }
         .onDisappear { stopPolling() }
+        // Diagnostic mode is a full-screen takeover so the SettingsView
+        // rail and the NavigationStack title don't overlap the
+        // controller diagram. The cover dismisses when the hold-2s
+        // exit fires (`diagnosticActive = false`).
+        .fullScreenCover(isPresented: $diagnosticActive) {
+            diagnosticGrid
+                .background(Theme.ink900.ignoresSafeArea())
+                .applyChiakiTheme()
+        }
     }
 
     // MARK: - Idle view (controllers connected, diagnostic not started)
@@ -472,41 +479,50 @@ private struct ControllerDiagnosticTab: View {
     // `onExitCommand`. Per Apple HIG: tvOS apps may capture Menu in
     // contexts where it's the natural exit affordance for a sub-mode.
 
+    /// Spatial controller diagram. Per online research on controller
+    /// diagnostic UIs (GamePadViewer, Steam Input Test, Adobe UX guide),
+    /// the dominant pattern is a silhouette that mirrors the physical
+    /// layout — D-pad bottom-left, sticks middle, face buttons
+    /// bottom-right, shoulders top. Recognition over recall.
+    ///
+    /// All clusters fit inside one viewport (no scroll). No focusable
+    /// elements — D-pad presses don't move SwiftUI focus or scroll.
     private var diagnosticGrid: some View {
         let c = snapshot.controllers[0]
-        let columns = [
-            GridItem(.flexible(), spacing: Theme.space5),
-            GridItem(.flexible(), spacing: Theme.space5)
-        ]
         let exitProgress = min(1.0, maxHoldDuration / exitHoldThreshold)
 
         return VStack(spacing: Theme.space6) {
-            diagnosticHeader(for: c)
-
-            LazyVGrid(columns: columns,
-                      alignment: .leading,
-                      spacing: Theme.space5) {
-                ForEach(c.buttons, id: \.name) { b in
-                    HStack {
-                        Image(systemName: b.pressed
-                              ? "circle.fill" : "circle")
-                            .foregroundStyle(b.pressed
-                                             ? Theme.green500
-                                             : .secondary)
-                        Text(b.name)
-                            .font(.system(.body, design: .default))
-                            .lineLimit(1)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, Theme.space2)
-                    .padding(.horizontal, Theme.space4)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color.white.opacity(b.pressed ? 0.10 : 0.04))
-                    )
-                }
+            // Shoulders / triggers (top of the controller)
+            HStack(alignment: .top, spacing: Theme.space7) {
+                shoulderColumn(buttons: c.buttons,
+                               trigger: "Left Trigger",
+                               shoulder: "Left Shoulder",
+                               triggerLabel: "L2", shoulderLabel: "L1")
+                Spacer(minLength: Theme.space7)
+                shoulderColumn(buttons: c.buttons,
+                               trigger: "Right Trigger",
+                               shoulder: "Right Shoulder",
+                               triggerLabel: "R2", shoulderLabel: "R1")
             }
             .padding(.horizontal, Theme.screenInset)
+
+            // Main controls row: D-pad / Sticks / Face buttons
+            HStack(alignment: .top, spacing: Theme.space7) {
+                dpadCluster(buttons: c.buttons)
+                Spacer()
+                stickCluster(buttons: c.buttons)
+                Spacer()
+                faceButtonCluster(buttons: c.buttons)
+            }
+            .padding(.horizontal, Theme.screenInset)
+
+            // System buttons row (Menu / Options / Home / Share /
+            // Touchpad — only the ones the controller actually exposes)
+            HStack(spacing: Theme.space4) {
+                ForEach(systemButtons(in: c.buttons), id: \.name) { b in
+                    pillIndicator(label: shortName(b.name), pressed: b.pressed)
+                }
+            }
 
             Spacer(minLength: 0)
 
@@ -514,10 +530,162 @@ private struct ControllerDiagnosticTab: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.top, Theme.space6)
-        // No .onExitCommand — it would let the Menu / B button on a
-        // controller exit instantly, defeating the purpose of being able
-        // to diagnose those exact buttons. Exit is hold-any-button-2s
-        // (see startPolling()).
+        // No .onExitCommand — it would let the Menu / B button exit
+        // instantly, defeating the purpose. Exit is hold-any-button-2s.
+    }
+
+    // MARK: - Cluster subviews (per swiftui-patterns view-composition rule)
+
+    /// L1/L2 or R1/R2 stack (one shoulder + one trigger).
+    private func shoulderColumn(buttons: [ControllerSnapshot.Button],
+                                trigger: String, shoulder: String,
+                                triggerLabel: String,
+                                shoulderLabel: String) -> some View {
+        VStack(alignment: .leading, spacing: Theme.space3) {
+            shoulderBar(label: triggerLabel, pressed: pressed(trigger, in: buttons))
+            shoulderBar(label: shoulderLabel, pressed: pressed(shoulder, in: buttons))
+        }
+    }
+
+    private func shoulderBar(label: String, pressed isPressed: Bool) -> some View {
+        Text(label)
+            .font(.system(.body).weight(.semibold))
+            .foregroundStyle(isPressed ? Theme.ink900 : .primary)
+            .frame(width: 200, height: 44)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(isPressed ? Theme.green500 : Color.white.opacity(0.08))
+            )
+            .animation(.easeOut(duration: 0.10), value: isPressed)
+    }
+
+    /// D-pad cross. Up, then [Left, Right], then Down.
+    private func dpadCluster(buttons: [ControllerSnapshot.Button]) -> some View {
+        VStack(spacing: Theme.space3) {
+            clusterCaption("D-PAD")
+            VStack(spacing: Theme.space2) {
+                dpadKey("↑", pressed: pressed("Direction Pad Up", in: buttons))
+                HStack(spacing: Theme.space2) {
+                    dpadKey("←", pressed: pressed("Direction Pad Left", in: buttons))
+                    Color.clear.frame(width: 56, height: 56)
+                    dpadKey("→", pressed: pressed("Direction Pad Right", in: buttons))
+                }
+                dpadKey("↓", pressed: pressed("Direction Pad Down", in: buttons))
+            }
+        }
+    }
+
+    private func dpadKey(_ glyph: String, pressed isPressed: Bool) -> some View {
+        Text(glyph)
+            .font(.system(size: 28, weight: .semibold))
+            .foregroundStyle(isPressed ? Theme.ink900 : .primary)
+            .frame(width: 56, height: 56)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(isPressed ? Theme.green500 : Color.white.opacity(0.08))
+            )
+            .animation(.easeOut(duration: 0.10), value: isPressed)
+    }
+
+    /// Two analog stick indicators with click-button states.
+    private func stickCluster(buttons: [ControllerSnapshot.Button]) -> some View {
+        VStack(spacing: Theme.space3) {
+            clusterCaption("STICKS")
+            HStack(spacing: Theme.space5) {
+                stickIndicator(label: "L",
+                               clickPressed: pressed("Left Thumbstick Button", in: buttons))
+                stickIndicator(label: "R",
+                               clickPressed: pressed("Right Thumbstick Button", in: buttons))
+            }
+        }
+    }
+
+    private func stickIndicator(label: String, clickPressed: Bool) -> some View {
+        ZStack {
+            Circle()
+                .fill(clickPressed ? Theme.green500 : Color.white.opacity(0.08))
+                .frame(width: 88, height: 88)
+            Text(label)
+                .font(.system(.title3).weight(.semibold))
+                .foregroundStyle(clickPressed ? Theme.ink900 : .primary)
+        }
+        .animation(.easeOut(duration: 0.10), value: clickPressed)
+    }
+
+    /// Face-button diamond — Y top, X left, B right, A bottom.
+    private func faceButtonCluster(buttons: [ControllerSnapshot.Button]) -> some View {
+        VStack(spacing: Theme.space3) {
+            clusterCaption("FACE BUTTONS")
+            VStack(spacing: Theme.space2) {
+                faceKey("Y", pressed: pressed("Button Y", in: buttons))
+                HStack(spacing: Theme.space2) {
+                    faceKey("X", pressed: pressed("Button X", in: buttons))
+                    Color.clear.frame(width: 56, height: 56)
+                    faceKey("B", pressed: pressed("Button B", in: buttons))
+                }
+                faceKey("A", pressed: pressed("Button A", in: buttons))
+            }
+        }
+    }
+
+    private func faceKey(_ glyph: String, pressed isPressed: Bool) -> some View {
+        Text(glyph)
+            .font(.system(size: 26, weight: .heavy))
+            .foregroundStyle(isPressed ? Theme.ink900 : .primary)
+            .frame(width: 56, height: 56)
+            .background(
+                Circle()
+                    .fill(isPressed ? Theme.green500 : Color.white.opacity(0.08))
+            )
+            .animation(.easeOut(duration: 0.10), value: isPressed)
+    }
+
+    /// System buttons (Menu / Options / Home / Share / Touchpad) as
+    /// rounded pills. Only renders the ones this controller exposes.
+    private func systemButtons(in buttons: [ControllerSnapshot.Button])
+        -> [ControllerSnapshot.Button]
+    {
+        let preferred = ["Button Share", "Button Options",
+                         "Button Menu", "Button Home", "Touchpad"]
+        var result: [ControllerSnapshot.Button] = []
+        for name in preferred {
+            if let b = buttons.first(where: { $0.name == name }) {
+                result.append(b)
+            }
+        }
+        return result
+    }
+
+    private func pillIndicator(label: String, pressed isPressed: Bool) -> some View {
+        Text(label)
+            .font(.system(.footnote).weight(.semibold))
+            .foregroundStyle(isPressed ? Theme.ink900 : .secondary)
+            .padding(.horizontal, Theme.space4)
+            .padding(.vertical, Theme.space2)
+            .background(
+                Capsule().fill(isPressed
+                               ? Theme.green500
+                               : Color.white.opacity(0.06))
+            )
+            .animation(.easeOut(duration: 0.10), value: isPressed)
+    }
+
+    private func clusterCaption(_ text: String) -> some View {
+        Text(text)
+            .font(.system(.caption2).weight(.semibold))
+            .tracking(1.2)
+            .foregroundStyle(.secondary)
+    }
+
+    /// Shorten the GameController button name to its display form
+    /// ("Button Menu" → "Menu", etc.).
+    private func shortName(_ name: String) -> String {
+        name.replacingOccurrences(of: "Button ", with: "")
+    }
+
+    private func pressed(_ buttonName: String,
+                         in buttons: [ControllerSnapshot.Button]) -> Bool {
+        buttons.first(where: { $0.name == buttonName })?.pressed ?? false
     }
 
     /// Footer with the exit instruction + a thin progress bar that
@@ -539,17 +707,6 @@ private struct ControllerDiagnosticTab: View {
         }
         .padding(.bottom, Theme.space5)
         .animation(.easeOut(duration: 0.12), value: progress)
-    }
-
-    private func diagnosticHeader(for c: ControllerSnapshot.Entry) -> some View {
-        VStack(spacing: Theme.space2) {
-            Text(c.vendorName)
-                .font(.system(.title2).weight(.semibold))
-            Text(c.profileClass)
-                .font(.system(.footnote, design: .monospaced))
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
     }
 
     private func startPolling() {
