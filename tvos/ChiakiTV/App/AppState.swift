@@ -34,6 +34,24 @@ enum ChiakiModal: Equatable {
     case errorToast(title: String, message: String)
 }
 
+/// `.sheet(item:)`-driven modals over the host list. Per
+/// `docs/ui/redesign-v2-report.md §C3`: presenting these as real sheets
+/// gives the user the system scrim + dim of the underlying content +
+/// Menu-button dismissal that route-replacement can't offer.
+enum SheetItem: Identifiable, Equatable {
+    case manualHost
+    case registration(Host)
+    case consolePin(hostId: String)
+
+    var id: String {
+        switch self {
+        case .manualHost:               return "manual"
+        case .registration(let host):   return "reg-\(host.id)"
+        case .consolePin(let hostId):   return "pin-\(hostId)"
+        }
+    }
+}
+
 struct ConfirmDialogModel: Equatable {
     let title: String
     let message: String
@@ -73,6 +91,7 @@ final class AppState {
     // Navigation
     var route: AppRoute = .hostList
     var modal: ChiakiModal? = nil
+    var sheet: SheetItem? = nil
 
     /// In-stream management overlay. Lifted to `AppState` so multiple input
     /// sources can request it: a long-press of the gamepad's Guide / PS
@@ -256,14 +275,15 @@ final class AppState {
 
     // MARK: - Navigation API (matches Main.qml's surface)
 
-    func showHostList()         { setRoute(.hostList,    label: "showHostList") }
-    func showManualHost()       { setRoute(.manualHost,  label: "showManualHost") }
-    func showRegistration(for host: Host) {
-        setRoute(.registration(host), label: "showRegistration(\(host.nickname))")
+    func showHostList() {
+        sheet = nil
+        setRoute(.hostList, label: "showHostList")
     }
-    func showConsolePin(hostId: String) {
-        setRoute(.consolePin(hostId: hostId), label: "showConsolePin(\(hostId))")
-    }
+    func showManualHost()       { sheet = .manualHost }
+    func showRegistration(for host: Host) { sheet = .registration(host) }
+    func showConsolePin(hostId: String)   { sheet = .consolePin(hostId: hostId) }
+    func dismissSheet()         { sheet = nil }
+
     func showSettings()         { setRoute(.settings,    label: "showSettings") }
     func showStream()           { setRoute(.stream,      label: "showStream") }
     func showAutoConnect(hostId: String) {
