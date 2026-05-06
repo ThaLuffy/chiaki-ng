@@ -2,104 +2,108 @@
 
 import SwiftUI
 
-/// "Add Manual Console" push-style dialog. Mirrors
-/// [`gui/src/qml/ManualHostDialog.qml`](../../../../gui/src/qml/ManualHostDialog.qml):
-///
-/// Two-row form: `Host:` text field + `Registered Consoles:` picker. The
-/// trailing **Add** button enables only when the host is non-empty AND a
-/// console has been picked.
-///
-/// Phase 0: persists nowhere — `onAdd` simply hands the values back to the
-/// caller. Phase 1 wires this to `Chiaki.addManualHost(consoleIndex, host)`.
+/// "Add Manual Console" sheet. Reskin of the prior full-screen form per
+/// [`docs/ui/redesign-plan.md §5.8`](../../../docs/ui/redesign-plan.md).
+/// Two rows: hostname/IP (focusable button → tvOS keyboard alert) and a
+/// console picker (Register on first connection / pick a registered host).
 struct ManualHostDialog: View {
     @Environment(AppState.self) private var appState
 
     @State private var host: String = ""
     @State private var registeredHostId: String = ""
 
-    /// The host text field is replaced with a focusable Button + system alert
-    /// pattern — same fix as RegistrationView's PIN row, since plain
-    /// `TextField` on tvOS doesn't reliably register with the focus engine.
     @State private var hostPromptShown = false
     @State private var hostDraft: String = ""
 
     private var registeredHosts: [RegisteredHost] { appState.registeredHosts }
 
-    /// Allow `Add` either when a registered console is picked AND a host is
-    /// entered, or when "Register on first connection" is the selection AND a
-    /// host is entered (matches the desktop's behavior).
     private var canAdd: Bool {
         !host.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     var body: some View {
-        ChiakiDialogChrome(
+        ChiakiSheet(
             title: "Add Manual Console",
-            onBack: { appState.showHostList() }
-        ) {
-            ChiakiButton(title: "Add", systemImage: "plus.circle.fill") {
-                addManualHost()
-                appState.showHostList()
-            }
-            .disabled(!canAdd)
-            .opacity(canAdd ? 1.0 : 0.4)
-        } content: {
-            VStack(alignment: .leading, spacing: Theme.dialogRowSpacing) {
-
-                HStack(spacing: Theme.dialogColumnSpacing) {
-                    Text("Host:")
-                        .font(.system(size: Theme.baseFontSize))
-                        .foregroundStyle(Theme.primaryText)
-                        .frame(width: 220, alignment: .trailing)
-
-                    hostButton
-                }
-
-                HStack(spacing: Theme.dialogColumnSpacing) {
-                    Text("Registered Console:")
-                        .font(.system(size: Theme.baseFontSize))
-                        .foregroundStyle(Theme.primaryText)
-                        .frame(width: 220, alignment: .trailing)
-
-                    Picker("Registered Console", selection: $registeredHostId) {
-                        Text("Register on first connection").tag("")
-                        ForEach(registeredHosts) { rh in
-                            Text(rh.nickname).tag(rh.id)
-                        }
+            subtitle: "Type a hostname or IP address. Useful when discovery " +
+                      "doesn't find your PS5 — different VLAN, hard-wired, etc.",
+            onBack: { appState.showHostList() },
+            content: {
+                VStack(alignment: .leading, spacing: 22) {
+                    fieldRow(label: "Address",
+                             hint: "Hostname or IP, e.g. 192.168.1.42") {
+                        hostButton
                     }
-                    .pickerStyle(.menu)
-                    .frame(width: Theme.dialogFieldWidth)
+
+                    fieldRow(label: "Linked console",
+                             hint: "Pair on first connection, or attach this " +
+                                   "address to a host you've already registered.") {
+                        consolePicker
+                    }
+                }
+            },
+            footer: {
+                ChiakiSheetSecondaryButton(title: "Cancel",
+                                           systemImage: "xmark") {
+                    appState.showHostList()
+                }
+                ChiakiSheetPrimaryButton(title: "Add",
+                                         systemImage: "plus.circle.fill",
+                                         isEnabled: canAdd) {
+                    addManualHost()
+                    appState.showHostList()
                 }
             }
-        }
+        )
     }
 
     // MARK: - Subviews
 
-    /// Focusable Button + system alert. tvOS-friendly text input.
+    @ViewBuilder
+    private func fieldRow<Trailing: View>(label: String, hint: String,
+                                          @ViewBuilder trailing: () -> Trailing) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(Theme.font(.titleMed))
+                .foregroundStyle(Theme.mist300)
+
+            trailing()
+
+            Text(hint)
+                .font(Theme.font(.bodySmall))
+                .foregroundStyle(Theme.mist500)
+                .italic()
+        }
+    }
+
+    /// Focusable button + system-alert TextField pattern. tvOS-friendly
+    /// text input where a digit-picker isn't appropriate (free text).
     private var hostButton: some View {
         Button {
-            hostDraft = host
+            hostDraft = host.isEmpty ? "192.168." : host
             hostPromptShown = true
         } label: {
             HStack {
-                Text(host.isEmpty ? "hostname or IP address" : host)
-                    .font(.system(size: Theme.baseFontSize))
-                    .foregroundStyle(host.isEmpty
-                                     ? Theme.tertiaryText
-                                     : Theme.primaryText)
+                Text(host.isEmpty ? "Tap to enter address" : host)
+                    .font(Theme.font(.monoMed))
+                    .foregroundStyle(host.isEmpty ? Theme.mist500 : Theme.white50)
                 Spacer()
+                Image(systemName: "keyboard")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(Theme.mist500)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 14)
-            .frame(width: Theme.dialogFieldWidth)
+            .padding(.horizontal, 18)
+            .frame(maxWidth: .infinity, minHeight: 56)
             .background(
-                RoundedRectangle(cornerRadius: Theme.smallRadius)
-                    .fill(Theme.surface)
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Theme.ink800.opacity(0.7))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Theme.ink600, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
-        .alert("Host", isPresented: $hostPromptShown) {
+        .alert("Address", isPresented: $hostPromptShown) {
             TextField("hostname or IP address", text: $hostDraft)
             Button("OK") {
                 host = hostDraft.trimmingCharacters(in: .whitespaces)
@@ -108,20 +112,37 @@ struct ManualHostDialog: View {
         }
     }
 
+    private var consolePicker: some View {
+        Picker("Linked console", selection: $registeredHostId) {
+            Text("Register on first connection").tag("")
+            ForEach(registeredHosts) { rh in
+                Text(rh.nickname).tag(rh.id)
+            }
+        }
+        .pickerStyle(.menu)
+        .padding(.horizontal, 18)
+        .frame(maxWidth: .infinity, minHeight: 56)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Theme.ink800.opacity(0.7))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Theme.ink600, lineWidth: 1)
+        )
+    }
+
     // MARK: - Actions
 
     private func addManualHost() {
         let trimmed = host.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
 
-        // If the user picked a registered console, sync that console's
-        // lastIpAddress to the new IP so the connect lookup will find it.
         if !registeredHostId.isEmpty,
            let idx = appState.registeredHosts.firstIndex(where: { $0.id == registeredHostId }) {
             appState.registeredHosts[idx].lastIpAddress = trimmed
         }
 
-        // Stable id for manual entries — use the IP itself.
         let manualHost = Host(
             id: trimmed,
             nickname: registeredHostId.isEmpty ? "Manual host (\(trimmed))" :
@@ -135,7 +156,6 @@ struct ManualHostDialog: View {
             state: .unknown
         )
 
-        // Replace any pre-existing manual host with the same IP.
         if let idx = appState.hosts.firstIndex(where: { $0.id == manualHost.id }) {
             appState.hosts[idx] = manualHost
         } else {

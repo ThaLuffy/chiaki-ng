@@ -2,49 +2,25 @@
 
 import SwiftUI
 
-/// PS5 registration dialog. Mirrors the desktop's
-/// [`gui/src/qml/RegistDialog.qml`](../../../gui/src/qml/RegistDialog.qml)
-/// **slimmed for the LAN-only / PS5-only port**:
+/// PS5 registration sheet. Reskin per [`docs/ui/redesign-plan.md §5.7`](../../docs/ui/redesign-plan.md):
 ///
-/// - PS4 firmware variants and the PS4 PSN-Online-ID field are dropped.
-/// - The "PSN Login" + "Public Lookup" inline buttons are dropped — the
-///   account ID is pulled from `AppSettings.psnAccountId` (prefilled).
-///
-/// Visible fields:
-///   • Host (read-only)
-///   • PSN Account-ID (from settings, read-only here)
-///   • Remote Play PIN (8 digits)
-///   • Console PIN (optional, 4 digits)
-///
-/// Phase 1: pressing Register kicks `RegistrationService.start(...)`. Live
-/// state updates are surfaced inline; on success we route back to the host
-/// list with the new RegisteredHost persisted.
+/// - Modal-style chrome instead of full-screen back-chevron toolbar.
+/// - 8-digit Remote Play PIN entered via `ChiakiDigitPicker` (no keyboard).
+/// - 4-digit Console PIN (optional) likewise.
+/// - PSN Account-ID is read-only — display-only chip with a hint pointing
+///   the user to Settings → App if they need to change it (resolves audit
+///   issue D4).
 struct RegistrationView: View {
     @Environment(AppState.self) private var appState
     let host: Host
 
-    @State private var pin: String = ""
-    @State private var consolePin: String = ""
-
-    /// Identifies the focusable controls on this screen so we can drive
-    /// initial focus via `.defaultFocus(...)`. tvOS's focus engine fights
-    /// with `.textFieldStyle(.plain)` + custom backgrounds (it tries to
-    /// attach a `_UIReplicantView` for the standard focus halo and warns
-    /// when our layout swallows it), so the PIN row is a focusable Button
-    /// that pops a system `.alert` containing the actual `TextField`.
-    private enum Field: Hashable { case pin, consolePin }
-    @FocusState private var focusedField: Field?
-
-    /// Driven by the PIN-row buttons; tvOS shows a system keyboard sheet
-    /// when the alert is presented.
-    @State private var pinPromptShown = false
-    @State private var consolePinPromptShown = false
-    @State private var pinDraft: String = ""
-    @State private var consolePinDraft: String = ""
+    @State private var pin: String = "00000000"
+    @State private var consolePin: String = "0000"
+    @State private var useConsolePin: Bool = false
 
     private var isValid: Bool {
-        let pinOK = pin.count == 8 && pin.allSatisfy(\.isNumber)
-        let cpinOK = consolePin.isEmpty
+        let pinOK = pin.count == 8 && pin.allSatisfy(\.isNumber) && pin != "00000000"
+        let cpinOK = !useConsolePin
             || (consolePin.count == 4 && consolePin.allSatisfy(\.isNumber))
         let accountOK = !appState.settings.psnAccountId.isEmpty
         return pinOK && cpinOK && accountOK
@@ -57,103 +33,61 @@ struct RegistrationView: View {
 
     private var statusMessage: String? {
         switch appState.registrationService.state {
-        case .idle:
-            return nil
-        case .running:
-            return "Registering against \(host.ipAddress)…"
-        case .succeeded(let h):
-            return "Paired '\(h.nickname)'."
-        case .failed(let msg):
-            return msg
-        case .canceled:
-            return "Canceled."
+        case .idle:           return nil
+        case .running:        return "Registering against \(host.ipAddress)…"
+        case .succeeded(let h): return "Paired '\(h.nickname)'."
+        case .failed(let msg):  return msg
+        case .canceled:         return "Canceled."
         }
     }
 
     private var statusColor: Color {
         switch appState.registrationService.state {
-        case .succeeded: return Theme.accent
-        case .failed:    return Theme.errorRed
-        default:         return Theme.secondaryText
+        case .succeeded: return Theme.green500
+        case .failed:    return Theme.rose500
+        default:         return Theme.mist500
         }
     }
 
     var body: some View {
-        ChiakiDialogChrome(
+        ChiakiSheet(
             title: "Register Console",
-            onBack: { appState.showHostList() }
-        ) {
-            ChiakiButton(
-                title: isRunning ? "Registering…" : "Register",
-                systemImage: "personalhotspot.circle.fill"
-            ) {
-                appState.registrationService.start(
-                    host: host,
-                    pin: pin,
-                    psnAccountIdBase64: appState.settings.psnAccountId
-                )
-            }
-            .disabled(!isValid || isRunning)
-            .opacity((!isValid || isRunning) ? 0.4 : 1.0)
-        } content: {
-            VStack(alignment: .leading, spacing: Theme.dialogRowSpacing) {
-                row("Host:") {
-                    Text(host.ipAddress.isEmpty ? host.nickname : host.ipAddress)
-                        .font(.system(size: Theme.baseFontSize))
-                        .foregroundStyle(Theme.secondaryText)
-                        .frame(width: Theme.dialogFieldWidth, alignment: .leading)
-                }
+            subtitle: "Pair this PS5 so future connections don't need a PIN.",
+            onBack: { appState.showHostList() },
+            content: {
+                VStack(alignment: .leading, spacing: 22) {
+                    summaryHeader
 
-                row("PSN Account-ID:") {
-                    Text(appState.settings.psnAccountId.isEmpty
-                         ? "(set in Settings → General)"
-                         : appState.settings.psnAccountId)
-                        .font(.system(size: Theme.baseFontSize))
-                        .foregroundStyle(appState.settings.psnAccountId.isEmpty
-                                         ? Theme.errorRed
-                                         : Theme.secondaryText)
-                        .frame(width: Theme.dialogFieldWidth, alignment: .leading)
-                }
+                    Divider().background(Theme.ink600)
 
-                row("Remote Play PIN:") {
-                    pinButton(text: $pin, max: 8, placeholder: "00000000",
-                              field: .pin,
-                              draft: $pinDraft, presented: $pinPromptShown)
-                }
+                    pinField
 
-                row("Console PIN [Optional]:") {
-                    pinButton(text: $consolePin, max: 4, placeholder: "0000",
-                              field: .consolePin,
-                              draft: $consolePinDraft,
-                              presented: $consolePinPromptShown)
-                }
-
-                row("Console:") {
-                    Text("PlayStation 5")
-                        .font(.system(size: Theme.baseFontSize))
-                        .foregroundStyle(Theme.primaryText)
-                        .frame(width: Theme.dialogFieldWidth, alignment: .leading)
-                }
-
-                if let msg = statusMessage {
-                    HStack {
-                        Spacer().frame(width: 280)
-                        Text(msg)
-                            .font(.system(size: Theme.baseFontSize))
-                            .foregroundStyle(statusColor)
-                            .frame(width: Theme.dialogFieldWidth, alignment: .leading)
+                    if let msg = statusMessage {
+                        statusLine(msg)
                     }
                 }
+                .frame(maxWidth: .infinity)
+            },
+            footer: {
+                ChiakiSheetSecondaryButton(title: "Cancel",
+                                           systemImage: "xmark") {
+                    appState.showHostList()
+                }
+                ChiakiSheetPrimaryButton(
+                    title: isRunning ? "Registering…" : "Register",
+                    systemImage: "personalhotspot.circle.fill",
+                    isEnabled: isValid && !isRunning
+                ) {
+                    appState.registrationService.start(
+                        host: host,
+                        pin: pin,
+                        psnAccountIdBase64: appState.settings.psnAccountId
+                    )
+                }
             }
-            // Land on the Remote Play PIN by default. `.defaultFocus` is the
-            // tvOS-correct way to set initial focus — using `.onAppear` to
-            // assign `@FocusState` races against the focus engine and gets
-            // overridden.
-            .defaultFocus($focusedField, .pin)
-        }
+        )
         .onChange(of: appState.registrationService.state) { _, new in
             if case .succeeded = new {
-                // Pop back to the host list shortly after success.
                 Task {
                     try? await Task.sleep(for: .milliseconds(600))
                     appState.registrationService.acknowledge()
@@ -163,68 +97,75 @@ struct RegistrationView: View {
         }
     }
 
-    // MARK: - Helpers
+    // MARK: - Sections
 
-    @ViewBuilder
-    private func row<Trailing: View>(_ label: String,
-                                     @ViewBuilder trailing: () -> Trailing) -> some View {
-        HStack(spacing: Theme.dialogColumnSpacing) {
-            Text(label)
-                .font(.system(size: Theme.baseFontSize))
-                .foregroundStyle(Theme.primaryText)
-                .frame(width: 280, alignment: .trailing)
-
-            trailing()
+    /// Read-only summary of what's about to be registered. PSN Account-ID
+    /// is displayed but not editable here — it lives in Settings → App.
+    private var summaryHeader: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            summaryRow(label: "Host",
+                       value: host.ipAddress.isEmpty ? host.nickname : host.ipAddress,
+                       valueColor: Theme.mist300)
+            summaryRow(label: "Console", value: "PlayStation 5",
+                       valueColor: Theme.mist300)
+            summaryRow(label: "PSN Account-ID",
+                       value: appState.settings.psnAccountId.isEmpty
+                              ? "Set this in Settings → App"
+                              : appState.settings.psnAccountId,
+                       valueColor: appState.settings.psnAccountId.isEmpty
+                                   ? Theme.rose500 : Theme.mist300)
         }
     }
 
-    /// tvOS-friendly numeric input. The visible row is a focusable `Button`
-    /// (which the focus engine handles cleanly); activating it pops an
-    /// `.alert` with the real `TextField` inside, which tvOS pairs with the
-    /// system keyboard automatically.
-    private func pinButton(text: Binding<String>,
-                           max: Int,
-                           placeholder: String,
-                           field: Field,
-                           draft: Binding<String>,
-                           presented: Binding<Bool>) -> some View {
-        Button {
-            draft.wrappedValue = text.wrappedValue
-            presented.wrappedValue = true
-        } label: {
-            HStack {
-                Text(text.wrappedValue.isEmpty ? placeholder : text.wrappedValue)
-                    .font(.system(size: Theme.baseFontSize))
-                    .foregroundStyle(text.wrappedValue.isEmpty
-                                     ? Theme.tertiaryText
-                                     : Theme.primaryText)
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 14)
-            .frame(width: Theme.dialogFieldWidth)
-            .background(
-                RoundedRectangle(cornerRadius: Theme.smallRadius)
-                    .fill(focusedField == field
-                          ? Theme.accent.opacity(0.25)
-                          : Theme.surface)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.smallRadius)
-                    .stroke(focusedField == field ? Theme.accent : .clear,
-                            lineWidth: 4)
-            )
+    private func summaryRow(label: String, value: String,
+                            valueColor: Color) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 16) {
+            Text(label.uppercased())
+                .font(Theme.font(.caption))
+                .foregroundStyle(Theme.mist500)
+                .tracking(1.2)
+                .frame(width: 180, alignment: .leading)
+            Text(value)
+                .font(Theme.font(.monoMed))
+                .foregroundStyle(valueColor)
+                .lineLimit(1)
         }
-        .buttonStyle(.plain)
-        .focused($focusedField, equals: field)
-        .alert("Enter PIN", isPresented: presented) {
-            TextField(placeholder, text: draft)
-                .keyboardType(.numberPad)
-            Button("OK") {
-                let digits = draft.wrappedValue.filter(\.isNumber)
-                text.wrappedValue = String(digits.prefix(max))
-            }
-            Button("Cancel", role: .cancel) {}
+    }
+
+    private var pinField: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("REMOTE PLAY PIN")
+                .font(Theme.font(.caption))
+                .foregroundStyle(Theme.mist500)
+                .tracking(1.2)
+
+            ChiakiDigitPicker(value: $pin, length: 8)
+
+            Text("Find this on your PS5: Settings → System → Remote Play → Link Device.")
+                .font(Theme.font(.bodySmall))
+                .foregroundStyle(Theme.mist500)
+                .italic()
+        }
+    }
+
+    private func statusLine(_ msg: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: statusGlyph)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(statusColor)
+            Text(msg)
+                .font(Theme.font(.bodyMed))
+                .foregroundStyle(statusColor)
+        }
+        .padding(.top, 8)
+    }
+
+    private var statusGlyph: String {
+        switch appState.registrationService.state {
+        case .succeeded: return "checkmark.circle.fill"
+        case .failed:    return "exclamationmark.triangle.fill"
+        case .running:   return "arrow.triangle.2.circlepath"
+        default:         return "info.circle"
         }
     }
 }
