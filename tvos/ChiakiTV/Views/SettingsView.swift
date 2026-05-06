@@ -142,7 +142,7 @@ private struct StreamTab: View {
                 segmentedRow("Render preset", selection: $appState.settings.renderPreset,
                              options: RenderPreset.allCases) { $0.label }
 
-                LabeledContent("Bitrate") {
+                SettingsRow("Bitrate") {
                     TVSlider(value: $appState.settings.bitrateKbps,
                              range: 2_000...50_000, step: 500,
                              format: { "\($0 / 1_000) Mbps" })
@@ -154,7 +154,10 @@ private struct StreamTab: View {
             }
 
             Section {
-                Toggle("Vertical sync", isOn: $appState.settings.verticalSync)
+                SettingsRow("Vertical sync") {
+                    Toggle("", isOn: $appState.settings.verticalSync)
+                        .labelsHidden()
+                }
             } footer: {
                 Text("Reduces tearing. Adds ~16 ms of latency.")
             }
@@ -163,11 +166,9 @@ private struct StreamTab: View {
     }
 }
 
-/// Reusable segmented-row helper. tvOS hides `Picker.title` when
-/// `.pickerStyle(.segmented)` is applied, so we wrap the picker in a
-/// `LabeledContent` to keep the label visible. Using a single helper
-/// instead of inline call-sites makes every segmented row identically
-/// shaped — a precondition for visual rhythm in a `Form`.
+/// Reusable segmented-row helper now built on top of `SettingsRow` so
+/// every segmented row inherits the same fixed label-column width and
+/// minimum row height as toggles, sliders, and drill-in pickers.
 @ViewBuilder
 fileprivate func segmentedRow<T: Hashable, S: RandomAccessCollection>(
     _ label: String,
@@ -175,7 +176,7 @@ fileprivate func segmentedRow<T: Hashable, S: RandomAccessCollection>(
     options: S,
     text: @escaping (T) -> String
 ) -> some View where S.Element == T, S: Sendable {
-    LabeledContent(label) {
+    SettingsRow(label) {
         Picker("", selection: selection) {
             ForEach(Array(options), id: \.self) { item in
                 Text(text(item)).tag(item)
@@ -194,12 +195,12 @@ private struct NetworkTab: View {
         @Bindable var appState = appState
         Form {
             Section {
-                LabeledContent("Audio buffer") {
+                SettingsRow("Audio buffer") {
                     TVSlider(value: $appState.settings.audioBufferMs,
                              range: 20...500, step: 10,
                              format: { "\($0) ms" })
                 }
-                LabeledContent("Volume") {
+                SettingsRow("Volume") {
                     TVSlider(value: $appState.settings.audioVolume,
                              range: 0...100, step: 5,
                              format: { "\($0)%" })
@@ -211,12 +212,12 @@ private struct NetworkTab: View {
             }
 
             Section {
-                LabeledContent("Weak Wi-Fi threshold") {
+                SettingsRow("Weak Wi-Fi threshold") {
                     TVSlider(value: $appState.settings.weakWifiThresholdPct,
                              range: 1...20, step: 1,
                              format: { "\($0)%" })
                 }
-                LabeledContent("Reported loss ceiling") {
+                SettingsRow("Reported loss ceiling") {
                     TVSlider(value: $appState.settings.packetLossReportedMax,
                              range: 1...20, step: 1,
                              format: { "\($0)%" })
@@ -256,13 +257,11 @@ private struct AppTab: View {
             }
 
             Section {
-                Button {
-                    psnDraft = appState.settings.psnAccountId
-                    psnPromptShown = true
-                } label: {
-                    HStack {
-                        Text("PSN Account-ID")
-                        Spacer()
+                SettingsRow("PSN Account-ID") {
+                    Button {
+                        psnDraft = appState.settings.psnAccountId
+                        psnPromptShown = true
+                    } label: {
                         Text(appState.settings.psnAccountId.isEmpty
                              ? "Not set"
                              : appState.settings.psnAccountId)
@@ -277,9 +276,15 @@ private struct AppTab: View {
             }
 
             Section {
-                Toggle("Streamer Mode", isOn: $appState.settings.streamerMode)
-                Toggle("Verbose Logs", isOn: $appState.settings.verboseLogs)
-                Toggle("Show Stream Stats", isOn: $appState.settings.showStreamStats)
+                SettingsRow("Streamer Mode") {
+                    Toggle("", isOn: $appState.settings.streamerMode).labelsHidden()
+                }
+                SettingsRow("Verbose Logs") {
+                    Toggle("", isOn: $appState.settings.verboseLogs).labelsHidden()
+                }
+                SettingsRow("Show Stream Stats") {
+                    Toggle("", isOn: $appState.settings.showStreamStats).labelsHidden()
+                }
             } header: {
                 Text("Diagnostics")
             } footer: {
