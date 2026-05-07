@@ -124,12 +124,14 @@ final class MetalRenderer: NSObject {
         displayLink = nil
     }
 
-    /// Render the currently-pending pixel buffer into `drawable` and
-    /// schedule it for `targetPresentationTimestamp`. Called from the
-    /// display-link delegate at vsync cadence.
-    fileprivate func drawIntoDrawable(_ drawable: CAMetalDrawable,
-                                      targetPresentationTimestamp: CFTimeInterval)
-    {
+    /// Render the currently-pending pixel buffer into `drawable`. Called
+    /// from the `CAMetalDisplayLink` delegate; the drawable is *already*
+    /// scheduled for the next vsync (`Update.targetPresentationTimestamp`),
+    /// so we use the time-less `commandBuffer.present(drawable)` —
+    /// `present(_:atTime:)` is explicitly forbidden under CAMetalDisplayLink
+    /// (`'-presentAtTime should not be called when using CAMetalDisplayLink.'`,
+    /// see `docs/reports/2026-05-07-02-15-run8.md`).
+    fileprivate func drawIntoDrawable(_ drawable: CAMetalDrawable) {
         let snap = pending.withLock { $0 }
         guard let pixelBuffer = snap.buffer else { return }
         guard let textureCache = textureCache,
@@ -168,9 +170,11 @@ final class MetalRenderer: NSObject {
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         encoder.endEncoding()
 
-        // Schedule for the predicted vsync rather than ASAP — the display
-        // link gave us this drawable specifically for this timestamp.
-        commandBuffer.present(drawable, atTime: targetPresentationTimestamp)
+        // The drawable is already scheduled by CAMetalDisplayLink for its
+        // own presentation timestamp; we just hand it back to the command
+        // buffer with the time-less overload. Calling `present(_:atTime:)`
+        // here would crash with `CAMetalDrawableInvalidOperation`.
+        commandBuffer.present(drawable)
         commandBuffer.commit()
 
         // Flush stale CV cache entries periodically.
@@ -279,7 +283,6 @@ final class MetalRenderer: NSObject {
 @available(tvOS 17.0, *)
 extension MetalRenderer: CAMetalDisplayLinkDelegate {
     func metalDisplayLink(_ link: CAMetalDisplayLink, needsUpdate update: CAMetalDisplayLink.Update) {
-        drawIntoDrawable(update.drawable,
-                         targetPresentationTimestamp: update.targetPresentationTimestamp)
+        drawIntoDrawable(update.drawable)
     }
 }
