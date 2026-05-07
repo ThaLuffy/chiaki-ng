@@ -33,15 +33,20 @@ struct AppSettings: Codable, Equatable {
 
     // MARK: Video
     /// Personal-use scope: Apple TV 4K 3rd gen + PS5 + DualSense, sub-16ms
-    /// added latency. Default to the target the port was built for so a
-    /// fresh install streams 4K HDR without anyone touching settings.
-    var resolution: VideoResolution = .res2160p
+    /// added latency. **PS5 Remote Play caps streaming at 1080p** (verified
+    /// by run7 2026-05-07 — requesting 2160p triggers `AvCap InitResult:-6`
+    /// from the PS5's video pipeline). The `.res2160p` enum case stays for
+    /// experimental opt-in but the default targets what the PS5 actually
+    /// serves: 1080p60 with HDR.
+    var resolution: VideoResolution = .res1080p
     var fps:        VideoFPS        = .fps60
-    /// 30 Mbps headroom for 4K60 HEVC. The chiaki preset table in
-    /// `lib/src/session.c:92-122` only goes up to 1080p (15 Mbps); our
-    /// resolution menu surfaces 1440p and 2160p as well, so the bitrate
-    /// default tracks the new top end. PS5 negotiates downward via
-    /// `video_profile_auto_downgrade=true` if it can't honour 4K60.
+    /// 30 Mbps cap for 1080p60 HEVC HDR. The bitrate field is sent to the
+    /// PS5 as `bwKbpsSent` ([`lib/src/launchspec.c:24`](../../../lib/src/launchspec.c))
+    /// — a *budget*, not a target. Higher cap = encoder has more bits for
+    /// scene complexity + HDR's PQ headroom (HDR typically wants ~30-50%
+    /// more bits than SDR at the same resolution + framerate). Upstream
+    /// chiaki's 15 Mbps 1080p preset is sized for SDR over Wi-Fi; on wired
+    /// GbE with HDR we have headroom to spare.
     var bitrateKbps: Int = 30_000
     var codec:      VideoCodec      = .h265hdr
     var renderPreset: RenderPreset  = .highQuality

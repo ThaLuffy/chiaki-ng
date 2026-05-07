@@ -79,18 +79,20 @@ final class ModelCodableTests: XCTestCase {
 
     func testAppSettingsKnownDefaults() {
         // Anchor a few documented defaults so accidental changes are flagged.
-        // Personal-use scope: Apple TV 4K 3rd gen + PS5 + DualSense at 4K60 HDR
-        // (see ../CLAUDE.md and docs/phases.md Phase 2).
+        // Personal-use scope: Apple TV 4K 3rd gen + PS5 + DualSense at
+        // **1080p60 HDR** (PS5 Remote Play caps at 1080p — see report
+        // docs/reports/2026-05-07-01-30-run7.md for the AvCap InitResult:-6
+        // failure that pinned this).
         let s = AppSettings()
         XCTAssertEqual(s.audioBufferMs, 30,
                        "30ms wired-LAN audio jitter buffer — see docs/optimization/native-alternatives-latency-first.md Phase A.5.")
         XCTAssertEqual(s.bitrateKbps, 30_000,
-                       "30 Mbps default for 4K60 HEVC HDR — see docs/phases.md Phase 2.")
+                       "30 Mbps cap for 1080p60 HEVC HDR — `bwKbpsSent` is a budget, not a target.")
         XCTAssertEqual(s.fps, .fps60)
-        XCTAssertEqual(s.resolution, .res2160p,
-                       "Default resolution is 2160p (4K) — personal-use Apple TV 4K target.")
+        XCTAssertEqual(s.resolution, .res1080p,
+                       "Default resolution is 1080p — PS5 Remote Play caps streaming at 1080p.")
         XCTAssertEqual(s.codec, .h265hdr,
-                       "Default codec is H.265 HDR — personal-use Apple TV 4K HDR target.")
+                       "Default codec is H.265 HDR — 1080p HDR is what PS5 Remote Play serves.")
         XCTAssertEqual(s.renderPreset, .highQuality)
         XCTAssertEqual(s.audioVolume, 100)
         XCTAssertTrue(s.verticalSync)

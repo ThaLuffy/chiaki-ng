@@ -90,6 +90,27 @@ ADR-style log of non-obvious choices for the chiaki-ng tvOS port. Each entry lis
 - Apple TV 4K's A15 is fastest at HEVC. The PS4 path would be tax on every change for a console that streams sub-1080p H.264.
 - Same as ps-remote-play: one console, one client, one symmetric configuration.
 
+## PS5 Remote Play caps at 1080p — defaults target 1080p60 HDR, not 4K60 HDR
+
+**Decision:** the streaming defaults target **1080p60 HEVC HDR**, not 4K. The `.res2160p` enum case stays in `VideoResolution` for users who want to experiment, but the shipped default is `.res1080p`.
+
+**When:** 2026-05-07, after [run7](reports/2026-05-07-01-30-run7.md).
+
+**Why:**
+- PS5 Remote Play does not stream 4K. The PS5 accepts the launch spec at the protocol level (BANG fires) and then its `Nagare` / `AvCap` video pipeline fails with `InitResult:-6`, terminating the stream connection (run7 logs).
+- Upstream chiaki-ng's UI caps at 1080p ([`gui/src/settings.cpp:454`](../../gui/src/settings.cpp), [`lib/src/session.c:92-122`](../../lib/src/session.c)) for exactly this reason — they never let users try 4K because the protocol rejects it.
+- `video_profile_auto_downgrade=true` in [`ctrl.c:1442-1461`](../../lib/src/ctrl.c) only handles **PS4** server types (server_type 0/1) — there is no `server_type == 2 && height > 1080` downgrade branch. We can't lean on it.
+- HDR (BT.2020 / SMPTE-2084 PQ) at 1080p60 *is* supported by PS5 Remote Play and is exactly what the Phase 2 HDR pipeline (HDR10 colorimetry on `CMFormatDescription`, BT.2020 PQ Metal render path, `AVDisplayCriteria(refreshRate:formatDescription:)`) was built for.
+
+**Bitrate is a cap, not a target:** the `bitrate` field on `ChiakiConnectVideoProfile` becomes `bwKbpsSent` in the launch spec ([`lib/src/launchspec.c:24`](../../lib/src/launchspec.c)) — it tells the PS5 "I (the client) can absorb up to this much bandwidth." The PS5 then chooses the actual encoded bitrate up to the cap based on scene complexity, codec, and HDR overhead. So:
+- A higher cap on a wired GbE link is essentially free — the PS5 won't waste bits if it doesn't need them.
+- HDR's PQ encoding wants ~30–50% more bits than equivalent SDR for the same perceived quality.
+- Upstream's 15 Mbps preset is sized for SDR over Wi-Fi. Our 30 000 kbps default leaves the encoder headroom for 1080p60 HDR on a wired LAN where we have it.
+
+Do not "match upstream's 15 Mbps" mechanically — that's the SDR-1080p preset.
+
+**How to apply:** if a future audit suggests bumping resolution back to 2160p, point them at run7 and the `ctrl.c:1442-1461` analysis. If the future audit suggests dropping bitrate to 15 000, point them at the cap-vs-target paragraph above.
+
 ## Build system: XcodeGen (`project.yml`) + SPM (`Package.swift`)
 
 **Decision:** XcodeGen produces `ChiakiTV.xcodeproj` from `project.yml` for the full app. SPM's `Package.swift` exists separately so the C bridge can be unit-tested headlessly with `swift test`.
